@@ -1,4 +1,4 @@
-import { CONTINUE_BANNER_KINDS, FOREIGN_TEXT_CAPS, capForeignText, escapeForeignControlChars, inlineForeignText, fromConvexAgentType, toConvexAgentType, resolveAgentLaunch, type AgentDefinitionSpec } from "@codecast/shared/contracts";
+import { CONTINUE_BANNER_KINDS, escapeForeignControlChars, fromConvexAgentType, toConvexAgentType, resolveAgentLaunch, type AgentDefinitionSpec } from "@codecast/shared/contracts";
 import { definitionLaunchFlags } from "../agentLaunch.js";
 import { CHEAP_MODEL } from "@codecast/shared/contracts/modelOptions";
 import { failReasonWords, handedBackWords, roundsOutWords } from "@codecast/shared/contracts/lineWords";
@@ -7,7 +7,6 @@ import { gateDoc } from "@codecast/shared/contracts/changeCard";
 import { countingSemaphore } from "../semaphore.js";
 import { WorkflowGraph, WorkflowNode, WorkflowRunState, NodeOutcome } from "./types";
 import { evalCondition, extractJsonOutput, lookupContextVar } from "./condition";
-import { planReadiness } from "../planReadiness.js";
 import { readGateCard } from "../cardFile.js";
 import { agentResultPreview, resultPreview } from "./chainWorkflow.js";
 import { spawnSync } from "../proc.js";
@@ -16,6 +15,7 @@ import { applyUnattended } from "../unattended.js";
 import { deviceId } from "../remote/device.js";
 import { LineProfileError, lineCommandEnv, lineProfileVars, loadLineProfile } from "../lineProfile.js";
 import { deadEndReason, profileFailure } from "./runFailure.js";
+import { handoffOf, readPlanFields, readTaskFields, routesOnlyOnHandoff } from "./taskContext.js";
 import { claimRun, readCheckpoint, resumePoint, runnerStamp, writeCheckpoint, type ResumePoint, type ResumeRow } from "./runResume.js";
 import presenterBase from "./presenter.md" with { type: "text" };
 import * as fs from "fs";
@@ -504,6 +504,8 @@ async function waitOnStation(
   let askedOnce = false;
   let heldDormant = false;
   let emptySince = 0;
+  let awaitingHandoff = false;
+  const routesOnHandoff = routesOnlyOnHandoff(graph, node.id);
   while (Date.now() - startMs < timeout) {
     await new Promise(r => setTimeout(r, pollInterval));
     const inbox = await cliCall(options, "/cli/inbox", { session_ids: [conversationId], show_all: true, limit: 5 });
@@ -590,12 +592,25 @@ async function waitOnStation(
       askedOnce = false;
       continue;
     }
+    const pinnedStatus: string = pinned?.status || "";
+    // A station whose edges route only on its handoff has answered when the
+    // handoff lands, not when its hand first ends a turn. A live hand that
+    // ended a turn on a check its tool moved to the background, with nothing
+    // pinned and no handoff yet, closed implement and the run failed "no
+    // outgoing edge" while the handoff came minutes later (ct-60145, 14 runs).
+    // It is waited on within the node's timeout; one that never hands off is
+    // killed there, as any stalled hand is.
+    if (asking && pinnedStatus !== "done" && pinnedStatus !== "blocked" && routesOnHandoff && options.taskId
+      && handoffOf(await cliCall(options, "/cli/work/get", { short_id: options.taskId })) === "none") {
+      if (!awaitingHandoff) console.log(`${c.dim}  ${shortId}: ended a turn without its handoff, waiting for it${c.reset}`);
+      awaitingHandoff = true;
+      continue;
+    }
     // The pin is display text, capped; its json block is stored whole as
     // `result`, which is what the station's edges route on.
     const pinnedResult: string = typeof pinned?.result === "string" ? pinned.result : "";
     const output = `work_state: ${state}${pinnedText ? `\n${pinnedText}` : ""}`;
     recordNodeOutput(context, node.id, output, pinnedResult || output);
-    const pinnedStatus: string = pinned?.status || "";
     // A hand whose session holds no message and no pin never ran a turn: its
     // process never started, or its transcript went to another conversation.
     // It answered nothing, so the station fails instead of passing an empty
@@ -1129,54 +1144,13 @@ export interface RunOptions {
   loadedStamp?: string;
 }
 
-// The task fields node prompts and edge conditions read. Loaded once at start
-// and again after every node, so a handoff or a verdict written by a hand is
-// visible to the next edge. A verdict older than `freshSince` reads as "none":
-// a review round that ended without a verdict must not re-route on the last
-// round's answer.
+// The task fields node prompts and edge conditions read (taskContext.ts).
+// Loaded once at start and again after every node, so a handoff or a verdict
+// written by a hand is visible to the next edge.
 async function loadTaskContext(options: RunOptions, context: Record<string, string>, freshSince = 0): Promise<void> {
   if (!options.taskId) return;
   const task = await cliCall(options, "/cli/work/get", { short_id: options.taskId });
-  if (!task) return;
-  // Why: every value here is expanded into node prompts through $vars
-  // and the `# Context` list, so it is escaped and capped as it enters
-  // the context rather than at each of those sites (ct-49593).
-  context["task_title"] = inlineForeignText(task.title);
-  context["task_description"] = capForeignText(
-    escapeForeignControlChars(task.description || ""),
-    FOREIGN_TEXT_CAPS.descriptionChars,
-  );
-  const criteria: string[] = (task.acceptance_criteria?.length ? task.acceptance_criteria : (task.steps || []).map((s: any) => s.title))
-    .map((c: string) => inlineForeignText(c));
-  context["acceptance_criteria"] = criteria.join("\n- ");
-  context["task_status"] = String(task.status || "");
-  context["execution_status"] = String(task.execution_status || "");
-  const verdict = task.review_verdict;
-  context["review_verdict"] = verdict && (verdict.at ?? 0) >= freshSince ? String(verdict.verdict) : "none";
-  context["review_note"] = verdict?.note ? capForeignText(escapeForeignControlChars(String(verdict.note)), FOREIGN_TEXT_CAPS.descriptionChars) : "";
-  // One routable value for "how did the hand end": the execution status of a
-  // handoff that placed the task in review, else none. A `changes` verdict
-  // moves the task to in_progress without clearing execution_status, so
-  // status = in_review is the freshness signal; a hand that ended without a
-  // handoff (an inline question, a decision, a crash) reads as none and no
-  // edge fires, which is the failure path.
-  context["handoff"] = String(task.status || "") === "in_review" ? String(task.execution_status || "none") : "none";
-  // What a hand that stopped (blocked, needs_context) said in its handoff: the
-  // question the line's ask gate puts to a person, whole. Only a gate's doc
-  // names it (no hand's prompt does), and a person answers what they can read
-  // to its end, so it carries no prompt cap.
-  context["handoff_note"] = context["handoff"] === "blocked" || context["handoff"] === "needs_context"
-    ? escapeForeignControlChars(String(task.verification_evidence || ""))
-    : "";
-  // The ground node's fields (the-line-end-to-end.md LE5), which the line's
-  // edges route on; empty until ground writes them.
-  context["goal_ref"] = inlineForeignText(task.goal_ref || "");
-  context["category"] = String(task.category || "");
-  context["risk"] = String(task.risk || "");
-  context["readiness"] = String(task.readiness || "");
-  context["readiness_note"] = inlineForeignText(task.readiness_note || "");
-  // Whose line this is, for the line's decision stack (LE11).
-  context["assignee"] = inlineForeignText(task.assignee_info?.name || task.assignee || "unassigned");
+  if (task) readTaskFields(task, context, freshSince);
 }
 
 // A cause remembers its attempts (line-workspace.md LW5): every run on a cause,
@@ -1193,23 +1167,11 @@ async function loadCauseHistory(options: RunOptions, context: Record<string, str
   context["cause_history"] = !read ? UNREAD_CAUSE_HISTORY : read.brief ? escapeForeignControlChars(String(read.brief)) : NO_CAUSE_HISTORY;
 }
 
-// The plan fields node prompts and edge conditions read, refreshed after
-// every node like the task's: `ready_tasks` counts the plan's tasks that can
-// start now, so plan-autopilot's loop routes on the plan as it is.
+// The plan fields node prompts and edge conditions read (taskContext.ts).
 async function loadPlanContext(options: RunOptions, context: Record<string, string>): Promise<void> {
   if (!options.planId) return;
   const plan = await cliCall(options, "/cli/plans/get", { short_id: options.planId });
-  if (!plan) return;
-  context["plan_title"] = inlineForeignText(plan.title);
-  context["plan_goal"] = capForeignText(
-    escapeForeignControlChars(plan.goal || ""),
-    FOREIGN_TEXT_CAPS.descriptionChars,
-  );
-  context["plan_acceptance_criteria"] = (plan.acceptance_criteria || [])
-    .map((c: string) => inlineForeignText(c)).join("\n- ");
-  const { open, ready } = planReadiness<any>(plan.tasks || [], plan.graph_outside);
-  context["ready_tasks"] = String(ready.length);
-  context["open_tasks"] = String(open.length);
+  if (plan) readPlanFields(plan, context);
 }
 
 // The repo's default branch, for prompts that diff a hand's branch against it.
