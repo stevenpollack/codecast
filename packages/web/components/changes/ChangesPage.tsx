@@ -276,11 +276,15 @@ export function ChangesPage() {
   const urlRepo = url.repo ? normalizeRepository(url.repo) : undefined;
   const foreign = !!urlRepo && teamRepoSet.size > 0 && !teamRepoSet.has(urlRepo);
   const feed = useSyncChangesTimeline({ teamId, repository: foreign ? undefined : urlRepo, today, chunks });
-  const defaultRepo = feed.recentReady || recentEditions.length ? repos[0]?.repo ?? knownRepo : undefined;
+  // Only a ranked repository is written into the URL. The recent feed reports
+  // ready a render before its rows reach the store, so the alphabetical
+  // fallback would otherwise be pinned in the URL ahead of the real ranking.
+  const rankedRepo = repos[0]?.repo;
+  const defaultRepo = rankedRepo ?? (feed.recentReady ? knownRepo : undefined);
   const repo = urlRepo && !foreign ? urlRepo : defaultRepo;
   useWatchEffect(() => {
-    if ((!urlRepo || foreign) && defaultRepo) setUrl({ repo: defaultRepo }, "replace");
-  }, [urlRepo, foreign, defaultRepo]);
+    if ((!urlRepo || foreign) && rankedRepo) setUrl({ repo: rankedRepo }, "replace");
+  }, [urlRepo, foreign, rankedRepo]);
 
   // ── Store rows ──────────────────────────────────────────────────────────
   const span = useMemo(() => ({ from_date: timelineChunk(today, chunks - 1).from_date, to_date: today }), [today, chunks]);

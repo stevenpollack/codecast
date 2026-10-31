@@ -25,6 +25,8 @@ export type FilterOptions = {
 };
 
 function RepoPicker({ repos, repo, onPick }: { repos: { repo: string; commits: number }[]; repo: string | undefined; onPick: (repo: string) => void }) {
+  // A repository with no recent work (an old link) still lists, so there is a way back to the ranked ones.
+  if (repo && !repos.some((r) => r.repo === repo)) repos = [...repos, { repo, commits: 0 }];
   if (repos.length < 2 || !repo) return null;
   return (
     <DropdownMenu>
