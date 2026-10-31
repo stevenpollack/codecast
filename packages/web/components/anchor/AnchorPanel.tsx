@@ -526,7 +526,7 @@ function PinChip({ pin, onMenu, drag }: { pin: ResolvedPin; onMenu: (e: React.Mo
   const status = pin.anchor ? deriveAnchorStatus(pin.anchor, now) : null;
   const dot = !status ? ""
     : status.tone === "attention" ? "bg-sol-yellow"
-    : status.tone === "working" ? "bg-sol-cyan animate-pulse"
+    : status.tone === "working" ? "bg-sol-cyan"
     : status.tone === "online" ? "bg-sol-green"
     : "";
   const label = status?.tone === "attention" ? `${pin.name} needs you`
