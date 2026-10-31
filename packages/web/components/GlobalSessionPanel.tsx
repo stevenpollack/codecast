@@ -92,6 +92,7 @@ import { useUpgradesOpen } from "./simple/billing";
 import type { NoticeKind } from "@codecast/shared/contracts/assistant";
 import { LabelChipsRow } from "./LabelChipsRow";
 import { isParkedDispatchError } from "../store/mutativeMiddleware";
+import { useTitlebarHead } from "../hooks/useTitlebarHead";
 import { PaneControls } from "./stage/PaneControls";
 import { useMountEffect } from "../hooks/useMountEffect";
 import { useAssistantScope, useHostedMode, useModeWords, useSurface } from "../lib/surfaces";
@@ -2201,6 +2202,7 @@ function SessionListPanelImpl({
   // Hosted mode lists the assistant's conversations unless widened
   // (hostedOnlyInbox); chipFilterOpts carries it into every list below.
   const hostedOnly = hostedOnlyInbox(s.clientState.ui);
+  const titlebarRef = useTitlebarHead<HTMLDivElement>();
   const router = useRouter();
   const handleKillDismissed = useCallback((id: string) => {
     soundKill();
@@ -3650,7 +3652,7 @@ function SessionListPanelImpl({
           onClear={clearSelection}
         />
       )}
-      <div className="cc-panel__head min-w-0">
+      <div ref={titlebarRef} className="cc-panel__head min-w-0">
         {hostedMode && !favoritesView && <HostedInboxHead outOfScope={outOfScope} />}
         {favoritesView && (
           <button
@@ -3977,6 +3979,13 @@ function SessionListPanelImpl({
             Input, Done to review), the agent right now (Working), then a
             machine event (Dormant). Nothing below Dormant is anyone's move. */}
         {renderSection("Done", statusDone, "text-sol-cyan", undefined, undefined, { count: countOf(statusDone, done, placed.counts.done), onDropSession: dropSessionOnRest.done })}
+        {(statusWorking.length > 0 || statusDormant.length > 0) && (
+          <div data-sv-not-on-you className="flex items-center gap-2 px-3 pt-3 pb-1 text-[10px] text-sol-text-dim">
+            <span className="h-px flex-1 bg-sol-border/50" />
+            <span className="shrink-0">{words.notOnYou}</span>
+            <span className="h-px flex-1 bg-sol-border/50" />
+          </div>
+        )}
         {renderSection("Working", statusWorking, "text-sol-green", "working", undefined, { count: countOf(statusWorking, working, placed.counts.working) })}
         {renderSection(words.sectionDormant, statusDormant, "text-sol-blue", undefined, undefined, { key: "dormant", count: countOf(statusDormant, dormant, placed.counts.dormant), onDropSession: dropSessionOnRest.dormant })}
         </>)}

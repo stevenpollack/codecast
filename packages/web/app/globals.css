@@ -2198,8 +2198,8 @@ diffs-container {
 /* Desktop: titlebar drag region for the overlay titlebar.
    --titlebar-inset clears the macOS traffic lights (main.js places them at
    x:16,y:12). .electron-drag-region is the global header; .titlebar-head is
-   a top row standing in for it in a window without that header (the
-   chromeless call window, lib/desktop attachTitlebarHead). */
+   any surface's top row standing in for it while zen mode hides that header
+   (hooks/useTitlebarHead), clearing the zen corner (ZenCorner). */
 :root {
   --titlebar-inset: 78px;
 }
@@ -2220,7 +2220,17 @@ diffs-container {
   /* Set per element by attachTitlebarHead: the lights' width minus the row's own left. */
   padding-left: var(--titlebar-edge-inset, var(--titlebar-inset)) !important;
 }
-/* Too narrow to indent (an icon-only rail): the row sits below the lights. */
+/* A lent strip on a surface with no stable top row (PageShell pages, the chat
+   rail): it has height only while it measures as the titlebar, so it vanishes
+   under a tab bar or when another row covers the band. */
+.titlebar-strip.titlebar-head {
+  height: 36px;
+  min-height: 36px;
+}
+.titlebar-strip.titlebar-head + [data-main-scroll] {
+  padding-top: 8px;
+}
+/* Too narrow to indent (an icon-only rail): the row sits below the corner. */
 .titlebar-head.titlebar-head--under {
   padding-top: 28px !important;
 }

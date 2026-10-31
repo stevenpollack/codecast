@@ -273,7 +273,7 @@ export const MODE_WORDS = {
     stash: "Stash",
     // The inbox row's hover actions, as their tooltips say them.
     stashTip: "Stash: set aside, keeps running",
-    killTip: "Kill: done, tears the agent down",
+    killTip: "Kill: stops the agent and its schedules, keeps the conversation",
     stashed: "Stashed",
     noStashed: "No stashed sessions",
     kill: "Kill Session",
@@ -331,6 +331,8 @@ export const MODE_WORDS = {
     sectionNeedsInput: "Needs Input",
     sectionDormant: "Dormant",
     sectionWorking: "Working",
+    // The divider above Working and Dormant: nothing below it waits on you.
+    notOnYou: "Not your move",
     // The count beside the inbox title, after its number ("2 to decide").
     decisionsBadge: "to decide",
     inboxClearTitle: "Inbox zero",
@@ -441,6 +443,7 @@ export const MODE_WORDS = {
     sectionNeedsInput: "Your move",
     sectionDormant: "Scheduled for later",
     sectionWorking: "Working on it",
+    notOnYou: "Not your move",
     decisionsBadge: "to answer",
     inboxClearTitle: "All caught up",
     noActive: "Nothing open right now",
