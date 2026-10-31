@@ -127,6 +127,7 @@ import { buildCompositeTimeline, mergeTimelineMessages } from "../lib/compositeT
 import { useMessageSelection } from "../hooks/useMessageSelection";
 import { ForkMapBox, ForkMapFallback } from "./ForkTreePanel";
 import { setupDesktopDrag, desktopHeaderClass } from "../lib/desktop";
+import { useTitlebarHead } from "../hooks/useTitlebarHead";
 import { MessageNavButton } from "./MessageBrowserPopover";
 import { AskSessionPanel } from "./conversation/AskSessionPanel";
 import { useAskSession } from "../hooks/useAskSession";
@@ -480,6 +481,12 @@ const ConversationViewInner = (
   const stickyDisabled = stickyPrefDisabled || !stickyPrompt || !stickyShown;
   const updateUI = useInboxStore(s => s.updateClientUI);
   const headerRef = useRef<HTMLElement>(null);
+  // Zen mode on desktop: the head ROW is the window titlebar (drag +
+  // traffic-light inset). The ref goes on the inner cc-panel__head — the
+  // element that paints the head background and bottom border — so the inset
+  // padding shares its surface; on the outer wrapper the padding area showed
+  // the wrapper's own darker background as a 78px block with a hard seam.
+  const titlebarHeadRef = useTitlebarHead<HTMLDivElement>();
   // The header row sheds chip detail level by level until the title fits
   // (see hooks/useSqueezeToFit and the .cq-sq* tiers in globals.css).
   const squeezeRowRef = useRef<HTMLDivElement>(null);
@@ -3939,6 +3946,7 @@ const ConversationViewInner = (
       )}
       <ConversationHeaderBar
         headerRef={bindHeader}
+        headRef={titlebarHeadRef}
         squeezeRowRef={squeezeRowRef}
         className={`${embedded ? "sticky top-0 z-20 bg-sol-bg-alt" : ""} ${!embedded ? deskClass : ""} ${isImageLightboxActive ? "invisible" : ""} ${hideHeader ? "hidden" : ""}`}
         lead={<>

@@ -53,6 +53,7 @@ import { WorkbenchSection } from "./WorkbenchSection";
 import { RailHeading, SectionRow, NavCount, NeedsInputCount, InboxNavRow, type SectionRowSpec } from "./sidebar/navPrimitives";
 import { ShellUsageMeter } from "./plan/UsageMeter";
 import { ChatNavRow, ChatDrillList } from "./sidebar/ChatNav";
+import { useTitlebarHead } from "../hooks/useTitlebarHead";
 import { channelSignals } from "../lib/chatRowSignals";
 import { SidebarDrillStack } from "./sidebar/SidebarDrill";
 import { useSidebarDrill } from "../hooks/useSidebarDrill";
@@ -609,6 +610,7 @@ export function Sidebar({ directoryFilter, isMobileOpen = false, onMobileClose, 
   const drillOn = !isNarrow && !surfaceMode.hosted;
   const chatDrills = drillOn && chatOn && !chatAway && !peek;
   const tasksDrill = drillOn && !workAway && taskViewItems.length > 0;
+  const titlebarStripRef = useTitlebarHead<HTMLDivElement>();
   const drill = useSidebarDrill(isChat ? "chat" : isTasks ? "tasks" : null, { chat: chatDrills, tasks: tasksDrill });
 
   // Pinned projects read their title from the store (PinnedRail).
@@ -1013,6 +1015,9 @@ export function Sidebar({ directoryFilter, isMobileOpen = false, onMobileClose, 
         ${isMobileOpen ? 'shadow-xl' : 'hidden md:flex'}
       `}
     >
+      {/* Zen mode on desktop: the sidebar is the leftmost surface, so a lent
+          strip clears the traffic lights (same pattern as the chat rail). */}
+      <div ref={titlebarStripRef} className="titlebar-strip shrink-0" />
       <SidebarDrillStack
         level={drill.level}
         shown={drill.shown}

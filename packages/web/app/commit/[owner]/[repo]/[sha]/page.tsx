@@ -7,7 +7,7 @@
 //
 // The page's accent is the commit itself: green when it mostly added, red when
 // it mostly removed, yellow when it rewrote about as much as it kept.
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type RefCallback } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { api as _api } from "@codecast/convex/convex/_generated/api";
@@ -50,6 +50,7 @@ import {
   useSyncCommit,
   useSyncPullRequest,
 } from "../../../../../hooks/useSyncTimeline";
+import { useTitlebarHead } from "../../../../../hooks/useTitlebarHead";
 import { serverErrorText } from "../../../../../lib/errorCause";
 import { serverCommentId, threadSide, type CodeCommentRow } from "../../../../../lib/prView";
 import {
@@ -138,6 +139,7 @@ function CommitHeader({
   commit,
   repository,
   neighbours,
+  headRef,
   threadCount,
   railOpen,
   onToggleRail,
@@ -145,6 +147,7 @@ function CommitHeader({
   commit: any;
   repository: string;
   neighbours: Neighbours;
+  headRef?: RefCallback<HTMLElement>;
   threadCount: number;
   railOpen: boolean;
   onToggleRail: () => void;
@@ -162,7 +165,7 @@ function CommitHeader({
   const githubUrl = `https://github.com/${repository}/commit/${commit.sha}`;
 
   return (
-    <header className="repo-band border-b border-sol-border/60 px-4 py-3 shrink-0">
+    <header ref={headRef} className="repo-band border-b border-sol-border/60 px-4 py-3 shrink-0">
       <div className="commit-head">
         <div className="commit-head-main min-w-0 flex items-start gap-3">
         <GitCommitHorizontal className="w-5 h-5 mt-1 shrink-0" style={{ color: "var(--repo-accent)" }} />
@@ -376,9 +379,11 @@ function CommitWithoutFiles({ repository, sha, named = false }: {
 function CommitContent({
   repository,
   sha,
+  headRef,
 }: {
   repository: string;
   sha: string;
+  headRef: RefCallback<HTMLElement>;
 }) {
   // Local first: the row may already be in the store from the timeline lane.
   // This feeder refreshes it and fills in what the lane leaves out.
@@ -535,6 +540,7 @@ function CommitContent({
         commit={commit}
         repository={repository}
         neighbours={neighbours}
+        headRef={headRef}
         threadCount={threadCount}
         railOpen={false}
         onToggleRail={() => rootRef.current?.querySelector("#commit-discussion")?.scrollIntoView({ block: "start" })}
@@ -577,12 +583,13 @@ function CommitContent({
 
 export default function CommitPage() {
   const params = useParams();
+  const titlebarRef = useTitlebarHead<HTMLElement>();
   const repository = `${params.owner as string}/${params.repo as string}`;
   const sha = params.sha as string;
 
   return (
     <RepoPageShell repository={repository}>
-      <CommitContent repository={repository} sha={sha} />
+      <CommitContent repository={repository} sha={sha} headRef={titlebarRef} />
     </RepoPageShell>
   );
 }

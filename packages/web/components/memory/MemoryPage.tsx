@@ -11,6 +11,7 @@ import { useMountEffect } from "../../hooks/useMountEffect";
 import { useWatchEffect } from "../../hooks/useWatchEffect";
 import { useEventListener } from "../../hooks/useEventListener";
 import { useTabActive } from "../../hooks/usePagePresence";
+import { useTitlebarHead } from "../../hooks/useTitlebarHead";
 import { useDerivedSize } from "../../hooks/useDerivedSize";
 import { useMemoryStore } from "../../store/memoryStore";
 import { LocalDaemonUnreachable } from "../LocalDaemonUnreachable";
@@ -80,6 +81,7 @@ function MemoryBody({ fit }: { fit: Fit }) {
   const convex = useConvex();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const titlebarRef = useTitlebarHead<HTMLDivElement>();
   const isTabActive = useTabActive();
 
   const connection = useMemoryStore((s) => s.connection);
@@ -192,7 +194,7 @@ function MemoryBody({ fit }: { fit: Fit }) {
       {fit !== "narrow" && <ProjectRail projects={projects} activeId={activeId} onSelect={(id) => go({ project: id, file: null })} />}
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="flex items-end gap-6 px-5 pt-4 pb-3">
+        <div ref={titlebarRef} className="flex items-end gap-6 px-5 pt-4 pb-3">
           <div className="flex-1 min-w-0">
             {fit === "narrow" ? (
               <select

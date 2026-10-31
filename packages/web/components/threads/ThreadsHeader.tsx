@@ -1,4 +1,5 @@
 import { CheckCheck, MessagesSquare } from "lucide-react";
+import { useTitlebarHead } from "../../hooks/useTitlebarHead";
 import { summaryCount } from "../../lib/threadCards";
 
 // The page head: title, the count for the view on screen (unread first, else
@@ -16,8 +17,9 @@ export function ThreadsHeader({
   total: number;
   onMarkAllRead: () => void;
 }) {
+  const headTitlebarRef = useTitlebarHead<HTMLElement>();
   return (
-    <header className="ch-head">
+    <header ref={headTitlebarRef} className="ch-head">
       <span className="ch-head-name">
         <span className="ch-head-hash" aria-hidden="true">
           <MessagesSquare className="w-3 h-3 inline-block" />

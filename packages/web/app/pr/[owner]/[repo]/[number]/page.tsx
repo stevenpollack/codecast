@@ -59,6 +59,7 @@ import {
 import { diffLineKey, parseDiffLineKey, type DiffLineAnchor } from "../../../../../lib/patchParser";
 import { usePageMeta } from "../../../../(marketing)/pageMeta";
 import { accentVar } from "../../../../../lib/externalEvents";
+import { TitlebarStrip } from "../../../../../lib/pageLayout";
 import "../../../../../components/pr/pr.css";
 import { keyBelongsElsewhere } from "../../../../../shortcuts/keyOwnership";
 import { matchesAction, withShortcut } from "../../../../../shortcuts";
@@ -471,6 +472,7 @@ export function PRContent({
       data-main-scroll
       style={{ ["--pr-accent" as string]: accentVar(PR_STATE_META[prStateKey(pr)].accent) }}
     >
+      <TitlebarStrip />
       <PRHeader
         pr={pr}
         repository={repository}
