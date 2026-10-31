@@ -4,12 +4,14 @@ import { replaceShortcodes } from "@codecast/shared/chat";
 // we know into unicode at ingest, but history imported against a thinner table
 // still stores the shortcode, and a name we do not know stays text. This walk
 // is the display half: it only rewrites mdast `text` nodes, so a shortcode
-// inside a fence or an inline code span is left alone.
+// inside a fence or an inline code span is left alone. Links are skipped too:
+// their text is a URL or an entity payload ("embed:link:<url>"), where a colon
+// pair like ":link:" is syntax, not an emoji.
 
 export function remarkEmojiShortcodes() {
   return (tree: any) => {
     const walk = (node: any) => {
-      if (!node) return;
+      if (!node || node.type === "link") return;
       if (node.type === "text" && typeof node.value === "string" && node.value.includes(":")) {
         node.value = replaceShortcodes(node.value);
       }
