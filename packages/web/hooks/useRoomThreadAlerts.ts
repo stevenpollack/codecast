@@ -1,7 +1,11 @@
 import { useRef } from "react";
 import { useInboxStore } from "../store/inboxStore";
 import { getRoomThreadSeen, isArrival } from "../lib/calls/roomThreadSeen";
+import { hasBrowserNotificationPermission, isElectron, notifyNative } from "../lib/desktop";
+import { cleanNotificationBody } from "../lib/notificationText";
 import { soundAgentReply, soundChatMessage } from "../lib/sounds";
+import type { ThreadRow } from "../components/calls/roomThreadModel";
+import { useWindowPresent } from "./usePagePresence";
 import { useRoomThreadUnread } from "./useRoomThreadUnread";
 import { useWatchEffect } from "./useWatchEffect";
 
@@ -12,12 +16,18 @@ import { useWatchEffect } from "./useWatchEffect";
  * unheard. A person's line plays the team chat's knock (same switch) unless
  * the thread is open in a focused window, where it is read as it lands.
  *
+ * The call's own surfaces show an agent's answer (AgentReplyPeek: over the
+ * stage, or hanging from the call's pill); with the app in the background it
+ * also goes up as a system banner, the one surface a person away from the
+ * window still sees.
+ *
  * Only lines that arrive while this runs: the backlog of a room you walk into
  * is history. Several lines in one push sound once, the agent's cue winning.
  */
 export function useRoomThreadAlerts(): void {
   const roomKey = useInboxStore((st: any) => (st.call.phase === "idle" ? null : st.call.roomKey ?? null));
   const { rows } = useRoomThreadUnread(roomKey);
+  const present = useWindowPresent();
   const heard = useRef<{ roomKey: string | null; at: number | null }>({ roomKey: null, at: null });
   const newestAt = rows?.[rows.length - 1]?.at ?? 0;
 
@@ -32,7 +42,15 @@ export function useRoomThreadAlerts(): void {
     heard.current = { roomKey, at: Math.max(since, newestAt) };
     const fresh = rows.filter((r) => r.at > since && isArrival(r));
     const agentLine = fresh.findLast((r) => r.agent);
-    if (agentLine) soundAgentReply(String(agentLine._id));
-    else if (fresh.length > 0 && !getRoomThreadSeen(roomKey).watching) soundChatMessage(String(fresh[fresh.length - 1]._id));
+    if (agentLine) {
+      soundAgentReply(String(agentLine._id));
+      if (!present) bannerAgentReply(agentLine);
+    } else if (fresh.length > 0 && !getRoomThreadSeen(roomKey).watching) soundChatMessage(String(fresh[fresh.length - 1]._id));
   }, [roomKey, rows, newestAt]);
+}
+
+function bannerAgentReply(row: ThreadRow): void {
+  if (!isElectron() && !hasBrowserNotificationPermission()) return;
+  const name = row.agent!.name ?? row.agent!.title;
+  void notifyNative(`${name} replied in the call`, cleanNotificationBody(row.text, 300), { key: `call-agent-reply:${row._id}` });
 }

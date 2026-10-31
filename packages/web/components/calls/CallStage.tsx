@@ -82,7 +82,7 @@ import { useRoomThreadUnread } from "../../hooks/useRoomThreadUnread";
 import { EdgeResizeHandle, useEdgeResize } from "../../hooks/useEdgeResize";
 import { UnreadCount } from "./UnreadCount";
 import { AgentReplyPeek } from "./AgentReplyPeek";
-import { takeCallThreadRequest } from "../../lib/calls/callStage";
+import { onCallThreadRequest, takeCallThreadRequest } from "../../lib/calls/callStage";
 import { keysOwnedElsewhere } from "../../shortcuts/keyOwnership";
 
 /** How long a speaker holds the floor before a follower's app moves to them. */
@@ -278,6 +278,14 @@ export function CallStage({
   // the rail was closed (lib/calls/roomThreadSeen: the same count the door to
   // the call in the app header wears when this stage is collapsed).
   const { rows, unread, latest } = useRoomThreadUnread(call.roomKey, threadOpen);
+  useWatchEffect(
+    () =>
+      onCallThreadRequest(() => {
+        takeCallThreadRequest();
+        setThreadOpen(true);
+      }),
+    [],
+  );
   const toggleThread = () => {
     if (threadOpen && !prefersReducedMotion()) setRailClosing(true);
     setThreadOpen((o) => !o);
@@ -495,9 +503,6 @@ export function CallStage({
             switch: the dot says the room is being transcribed whether or not
             the rail is open, and the switch itself lives in the thread. The
             count is what landed in the thread while it was closed. */}
-        {/* The thread button carries the peek: an agent's answer that
-            landed while the rail was closed hangs under it for a moment. */}
-        <span className="relative shrink-0">
         <StageChromeButton
           onClick={toggleThread}
           active={threadOpen}
@@ -526,8 +531,6 @@ export function CallStage({
           )}
           <UnreadCount count={unread} agent={!!latest?.agent} />
         </StageChromeButton>
-        <AgentReplyPeek row={latest} onOpen={() => !threadOpen && toggleThread()} />
-        </span>
 
         <HeaderRule />
 
@@ -619,6 +622,9 @@ export function CallStage({
           )}
         </div>
         </StageHostProvider>
+        {/* An agent's answer that landed while the rail was closed, over the
+            bottom of the video where the people talking are looking. */}
+        <AgentReplyPeek row={latest} onOpen={() => !threadOpen && toggleThread()} />
         {call.roomKey && <StagePersonMenu roomKey={call.roomKey} state={personMenu} selfId={myUserId ?? null} />}
         {(threadOpen || railClosing) && call.roomKey && (
           <ThreadRail

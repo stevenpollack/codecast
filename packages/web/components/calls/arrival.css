@@ -1,9 +1,8 @@
 /* An agent answered in the call's chat. People are mid-conversation and
  * looking at faces, so the answer has to pull the eye without moving the
  * layout: the badge wears the agent's violet and sends a wide ring out from
- * itself six times (about eight seconds), then sits still. The peek under the
- * thread button says who answered and how it begins, and stays long enough
- * to be noticed. Under reduced motion both simply appear. */
+ * itself six times (about eight seconds), then sits still. The card below
+ * (.agent-reply) shows who answered and what they said. Under reduced motion both simply appear. */
 
 .arrival-ring {
   animation:
@@ -25,68 +24,164 @@
   }
 }
 
-.agent-peek {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 30;
+/* The answer itself (AgentReplyPeek): a band with the agent's face and name
+ * in violet over the words, on dark glass, in two settings: over the bottom
+ * of the video on the stage, and hanging by a notch from the call's pill in
+ * the header while the stage is closed. */
+.agent-reply {
+  --ar-edge: color-mix(in srgb, var(--sol-violet) 50%, transparent);
+  --ar-band: color-mix(in srgb, var(--sol-violet) 16%, transparent);
+  position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  width: max-content;
-  max-width: min(320px, 70vw);
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--sol-violet) 28%, transparent);
-  background: color-mix(in srgb, var(--sol-violet) 9%, var(--sol-bg));
-  box-shadow: 0 8px 24px -10px rgb(0 0 0 / 0.6);
+  border: 1px solid var(--ar-edge);
+  border-radius: 14px;
+  font-family: var(--font-mono);
+  text-align: left;
+  pointer-events: auto;
+  animation:
+    agent-reply-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    agent-reply-ring 1.5s cubic-bezier(0.22, 1, 0.36, 1) 260ms 3;
+}
+.agent-reply[data-leaving] {
+  animation: agent-reply-out 180ms ease-in forwards;
+}
+.agent-reply-open {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
   text-align: left;
   cursor: pointer;
-  animation: agent-peek-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.agent-peek:hover {
-  border-color: color-mix(in srgb, var(--sol-violet) 45%, transparent);
+.agent-reply-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 40px 7px 12px;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--sol-violet) 75%, var(--sol-text));
 }
-.agent-peek[data-leaving] {
-  animation: agent-peek-out 160ms ease-in forwards;
+.agent-reply-head b {
+  font-weight: 700;
 }
-/* A notch pointing at the button it belongs to. */
-.agent-peek::before {
+/* What a click does, said only under the pointer. */
+.agent-reply-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--sol-text-dim);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+.agent-reply:hover .agent-reply-go {
+  opacity: 1;
+}
+.agent-reply-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  margin: 0 14px 12px;
+  color: var(--sol-text);
+}
+.agent-reply-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 3px;
+  border-radius: 6px;
+  color: var(--sol-text-dim);
+  opacity: 0.7;
+}
+.agent-reply-close:hover {
+  background: color-mix(in srgb, var(--sol-text) 8%, transparent);
+  color: var(--sol-text);
+  opacity: 1;
+}
+
+/* On the stage: glass over the video, where the captions run. */
+.agent-reply-lane {
+  pointer-events: none;
+  position: absolute;
+  inset: auto 32px 30px;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+}
+.agent-reply[data-variant="stage"] {
+  width: min(760px, 100%);
+}
+/* Both settings wear the same dark glass (the bubble carries the dark
+ * palette itself, so it reads the same over a light app). */
+.agent-reply[data-variant] {
+  --ar-edge: color-mix(in srgb, var(--sol-violet) 55%, rgb(255 255 255 / 0.08));
+  background: color-mix(in srgb, var(--sol-bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow:
+    0 18px 50px -20px rgb(0 0 0 / 0.8),
+    inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+.agent-reply[data-variant] .agent-reply-head {
+  padding: 12px 44px 4px 14px;
+  font-size: 13.5px;
+  color: color-mix(in srgb, var(--sol-violet) 55%, white);
+}
+.agent-reply[data-variant] .agent-reply-text {
+  margin: 0 18px 16px 46px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Under the call's pill: the same card, hanging from it by a notch. */
+.agent-reply[data-variant="bubble"] {
+  position: fixed;
+  z-index: 70;
+  max-width: calc(100vw - 16px);
+  transform-origin: var(--ar-notch) -10px;
+}
+.agent-reply[data-variant="bubble"] .agent-reply-text {
+  font-size: 14.5px;
+}
+.agent-reply[data-variant="bubble"]::before {
   content: "";
   position: absolute;
   top: -5px;
-  right: 22px;
-  width: 8px;
-  height: 8px;
-  rotate: 45deg;
-  border-left: inherit;
-  border-top: inherit;
-  background: inherit;
+  left: var(--ar-notch);
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  transform: rotate(45deg);
+  border-radius: 2px 0 0 0;
+  background: var(--sol-bg);
+  border-left: 1px solid var(--ar-edge);
+  border-top: 1px solid var(--ar-edge);
 }
-.agent-peek-name {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--sol-violet);
-}
-.agent-peek-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--sol-text-secondary);
-}
-@keyframes agent-peek-in {
+
+@keyframes agent-reply-in {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.98);
+    transform: translateY(6px) scale(0.98);
   }
 }
-@keyframes agent-peek-out {
+@keyframes agent-reply-ring {
+  from {
+    outline: 0 solid color-mix(in srgb, var(--sol-violet) 55%, transparent);
+    outline-offset: 0;
+  }
+  to {
+    outline: 10px solid transparent;
+    outline-offset: 2px;
+  }
+}
+@keyframes agent-reply-out {
   to {
     opacity: 0;
-    transform: translateY(-2px);
+    transform: translateY(4px);
   }
 }
 
@@ -94,8 +189,8 @@
   .arrival-ring {
     animation: none;
   }
-  .agent-peek,
-  .agent-peek[data-leaving] {
+  .agent-reply,
+  .agent-reply[data-leaving] {
     animation: none;
   }
 }

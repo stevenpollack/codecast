@@ -1621,6 +1621,8 @@ export async function runVoiceCommand(cmd: string, args: unknown[]): Promise<voi
   const a = args as any[];
   switch (cmd) {
     case "expandCall":
+      // Opened from a door showing the call's chat: the stage opens on it.
+      if (a[0] === "thread") (await import("./callStage")).requestCallThread();
       hostExpand?.();
       return;
     case "startBurst":

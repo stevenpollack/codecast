@@ -33,12 +33,22 @@ export function openCallStage(): void {
 }
 
 // A door that was showing unread chat opens the stage with its thread open:
-// the count is why the person clicked. The stage takes the request once, as
-// it mounts, in this window.
+// the count is why the person clicked. A stage mounting takes the request
+// once; a stage already up (the desktop's call window, shrunk to faces and
+// expanded again) hears it as it is made.
 let threadWanted = false;
+const threadListeners = new Set<() => void>();
 
 export function requestCallThread(): void {
   threadWanted = true;
+  for (const cb of threadListeners) cb();
+}
+
+export function onCallThreadRequest(cb: () => void): () => void {
+  threadListeners.add(cb);
+  return () => {
+    threadListeners.delete(cb);
+  };
 }
 
 export function takeCallThreadRequest(): boolean {

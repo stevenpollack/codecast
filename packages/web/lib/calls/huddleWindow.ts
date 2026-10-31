@@ -27,7 +27,7 @@ export async function focusExistingHuddle(): Promise<boolean> {
  * a join from a focus) is what made the expand button do nothing whenever the
  * mirror lagged or the call lived elsewhere. False when nothing took it.
  */
-export async function expandCall(): Promise<boolean> {
-  if (voiceHostElsewhere()) return sendVoiceCommand('expandCall');
+export async function expandCall(opts: { thread?: boolean } = {}): Promise<boolean> {
+  if (voiceHostElsewhere()) return sendVoiceCommand('expandCall', opts.thread ? ['thread'] : []);
   return huddleInOtherWindow() && await showCallPanel();
 }

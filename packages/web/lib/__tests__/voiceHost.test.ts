@@ -18,7 +18,7 @@ import {
   walkieCallState,
 } from "../calls/walkie";
 import { runCallCommand } from "../calls/callManager";
-import { focusExistingHuddle } from "../calls/huddleWindow";
+import { expandCall, focusExistingHuddle } from "../calls/huddleWindow";
 import { deriveFaceRow, faceRowInputFrom, faceRowInputSig } from "../faces/faceRow";
 import { walkieDoorOpen } from "../calls/walkieDoor";
 import { useInboxStore } from "../../store/inboxStore";
@@ -168,6 +168,21 @@ describe("raising the call from another window", () => {
     await runVoiceCommand("expandCall", []);
     onHostExpand(null);
     expect(expanded).toBe(1);
+  });
+
+  it("an expand from a door showing the call's chat opens the host's stage on its thread", async () => {
+    const s = shell();
+    s.role({ ...ROLE, voiceWindow: true });
+    expect(await expandCall({ thread: true })).toBe(true);
+    expect(s.commands).toEqual([["expandCall", ["thread"]]]);
+    const { takeCallThreadRequest } = await import("../calls/callStage");
+    takeCallThreadRequest();
+    let expanded = 0;
+    onHostExpand(() => expanded++);
+    await runVoiceCommand("expandCall", ["thread"]);
+    onHostExpand(null);
+    expect(expanded).toBe(1);
+    expect(takeCallThreadRequest()).toBe(true);
   });
 });
 

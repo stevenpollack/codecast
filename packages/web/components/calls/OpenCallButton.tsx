@@ -15,9 +15,10 @@ import { ShortcutTooltip } from "../KeyboardShortcutsHelp";
  * is, and the stage's shrink goes back. In a browser the stage is an overlay
  * in this page; on the desktop it is the call window (lib/calls/huddleWindow).
  */
-function openTheCall(): void {
+export function openTheCall(thread = false): void {
+  if (thread) requestCallThread();
   if (!canPopOutCall()) return openCallStage();
-  void expandCall().then((shown) => {
+  void expandCall({ thread }).then((shown) => {
     if (!shown) void popOutCall();
   });
 }
@@ -37,8 +38,7 @@ export function OpenCallButton() {
         <button
           type="button"
           onClick={() => {
-            if (unread > 0) requestCallThread();
-            openTheCall();
+            openTheCall(unread > 0);
           }}
           data-open-call
           data-card-action="open"
