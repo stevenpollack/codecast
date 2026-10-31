@@ -49,6 +49,7 @@ interface BuildOptions {
   change?: string;
   recommend?: string;
   why?: string;
+  confidence?: string;
   ask?: string;
   words?: string;
   base?: string;
@@ -82,6 +83,12 @@ function readJson<T>(file: string, what: string): T {
 }
 
 /** "2 files changed, 18 insertions(+), 7 deletions(-)" into counts; null when git has nothing to say. */
+/** The author's confidence in its recommendation, from the flag or the words (the flag wins). Kept as written, so the validator names one outside 0 to 100 rather than the card silently losing it. */
+export function authorConfidence(flag: string | undefined, words: Record<string, any>): number | undefined {
+  if (flag !== undefined) return Number(flag);
+  return words.confidence ?? undefined;
+}
+
 export function parseShortstat(line: string): { files: number; added: number; removed: number } | null {
   const files = /(\d+) files? changed/.exec(line);
   if (!files) return null;
@@ -298,6 +305,7 @@ async function buildCard(deps: PublishDeps, options: BuildOptions): Promise<void
   const risk = words.risk && typeof words.risk === "object" && typeof words.risk.reason === "string"
     ? { class: String(words.risk.class ?? "") as RiskClass, reason: words.risk.reason }
     : null;
+  const confidence = authorConfidence(options.confidence, words);
   if (options.recommend && !CHANGE_VERDICTS.includes(options.recommend as ChangeVerdict)) {
     fail(`--recommend takes ${CHANGE_VERDICTS.join(" | ")}, got "${options.recommend}"`);
   }
@@ -318,7 +326,7 @@ async function buildCard(deps: PublishDeps, options: BuildOptions): Promise<void
     context: options.context,
     wrong: options.wrong,
     change: options.change,
-    recommend: options.recommend ? { verdict: options.recommend as ChangeVerdict, why: options.why?.trim() ?? "" } : null,
+    recommend: options.recommend ? { verdict: options.recommend as ChangeVerdict, why: options.why?.trim() ?? "", ...(confidence !== undefined ? { confidence } : {}) } : null,
     ask: options.ask,
     earlier: Array.isArray(history?.earlier) ? history.earlier : null,
     examples,
@@ -464,7 +472,8 @@ export function registerCardCommand(program: Command, deps: PublishDeps): void {
     .option("--change <text>", stdinText("What behaves differently after this change, one or two sentences"))
     .option("--recommend <verdict>", `${CHANGE_VERDICTS.join(" | ")}`)
     .option("--why <text>", stdinText("One sentence on why that recommendation"))
-    .option("--words <json>", "The author's fields in one JSON object (or a file), such as a presenting station's pinned result: recommend and why, covers [sg-N] (the findings the change reaches; the card counts reach from them), and optionally headline, context, wrong, change, ask (the suggested Revise note), risk { class, reason }, seen [{ signal, asked, quote, missing }], reach { conversations, of, covers }, stops { per_week, what, next, basis }, overturns { ref, by, what, why } and examples [{ input, before, after, note }]; other keys (question, page) are the author's decision's and are ignored; a flag of the same name wins")
+    .option("--confidence <n>", "The chance, 0 to 100, that a person answers with the recommended verdict")
+    .option("--words <json>", "The author's fields in one JSON object (or a file), such as a presenting station's pinned result: recommend, why and confidence (0 to 100), covers [sg-N] (the findings the change reaches; the card counts reach from them), and optionally headline, context, wrong, change, ask (the suggested Revise note), risk { class, reason }, seen [{ signal, asked, quote, missing }], reach { conversations, of, covers }, stops { per_week, what, next, basis }, overturns { ref, by, what, why } and examples [{ input, before, after, note }]; other keys (question, page) are the author's decision's and are ignored; a flag of the same name wins")
     .option("--base <ref>", "Base for the diff stats (default: the eval result's base, else origin/main)")
     .option("--dir <dir>", "A run's directory: reads eval-result.json and proof.json from it when present, and writes card.json there")
     .option("--out <file>", "Where card.json goes (default: card.json, in --dir when given); the page goes beside it as .html")

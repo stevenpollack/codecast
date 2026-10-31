@@ -128,7 +128,8 @@ export interface ChangeCard {
   diff: { files: number; added: number; removed: number; pr?: string };
   risk: { class: RiskClass; reason: string };
   /** `source` "evidence": the reader turned the author's verdict to Drop because no finding is left behind the problem; the why is that, not the checks. */
-  recommend: { verdict: ChangeVerdict; why: string; source?: "evidence" };
+  /** `confidence`: the author's chance, 0 to 100, that a person answers with this verdict; set on newer cards, so answered decisions show whether it is calibrated. */
+  recommend: { verdict: ChangeVerdict; why: string; confidence?: number; source?: "evidence" };
   /** `usd`: money billed (evals, call nodes, sessions on a metered key). `list_usd`: the runs' subscription sessions at API list price, an equivalent never billed. Read through costParts. */
   cost: { tokens: number; usd: number; minutes: number; list_usd?: number };
   /** The cause's earlier shipped fixes, oldest first, so a person sees what was tried beside what is proposed now, and whether it held (line-workspace.md LW5). Absent when nothing shipped before. */
@@ -338,6 +339,10 @@ export function validateChangeCard(input: unknown): ChangeCardValidation {
   if (rec) {
     oneOf("recommend.verdict", rec.verdict, CHANGE_VERDICTS);
     str("recommend.why", rec.why);
+    const conf: unknown = rec.confidence;
+    if (conf !== undefined && !(typeof conf === "number" && Number.isInteger(conf) && conf >= 0 && conf <= 100)) {
+      err("recommend.confidence", "a whole number from 0 to 100: the chance a person answers with this verdict");
+    }
     const failing = cardChecks.filter((x) => !x.ok).map((x) => x.name);
     if (rec.verdict === "ship" && failing.length) {
       err("recommend.verdict", failing.includes(BASE_CHECK)
@@ -497,6 +502,11 @@ export function riskLabel(risk: Pick<ChangeCard["risk"], "class">, short = false
   return short ? "High risk" : "High risk: needs its own plan";
 }
 
+/** The recommendation's confidence as a card says it ("80% sure"), or null on a card without one. */
+export function confidenceLabel(rec: { confidence?: number } | null | undefined): string | null {
+  return typeof rec?.confidence === "number" ? `${rec.confidence}% sure` : null;
+}
+
 /** The answer's word, or a neutral one while the card has no recommendation yet. */
 export function verdictLabel(verdict: ChangeVerdict | "" | undefined): string {
   return verdict === "ship" ? "Ship" : verdict === "revise" ? "Revise" : verdict === "drop" ? "Drop" : "No recommendation";
@@ -582,7 +592,7 @@ export interface CardAssemblyInput {
   ask?: string;
   wrong?: string;
   change?: string;
-  recommend?: { verdict: ChangeVerdict; why: string } | null;
+  recommend?: { verdict: ChangeVerdict; why: string; confidence?: number } | null;
   /** The cause's earlier shipped fixes (causeHistory earlierFixes). */
   earlier?: EarlierFix[] | null;
   /** The author's reading of the risk: what the change touches and how much traffic reaches it. Outranks the task's ground rating. */

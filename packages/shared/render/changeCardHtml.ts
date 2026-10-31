@@ -7,6 +7,7 @@ import {
   costParts,
   proofSummary,
   honestChecks,
+  confidenceLabel,
   riskLabel,
   verdictLabel,
   type CardCheck,
@@ -205,6 +206,7 @@ h3{font-size:13px;font-weight:650;color:var(--muted);margin:0 0 6px}
 .costs .num{font-size:15px;color:var(--ink)}
 .rec{margin-top:28px;border-radius:14px;padding:18px 20px;background:var(--tone-soft);display:flex;gap:16px;align-items:baseline}
 .rec .word{font-size:22px;font-weight:700;color:var(--tone);flex:none}
+.rec .sure{font-size:13px;font-weight:600;color:var(--tone);flex:none;font-variant-numeric:tabular-nums}
 .rec p{margin:0;font-size:16px}
 footer{margin-top:18px;text-align:center;font-size:12.5px;color:var(--faint)}
 @media (max-width:640px){
@@ -276,7 +278,7 @@ ${checksList(honestChecks(card.checks))}
   <div class="panel"><h3>Risk</h3><div class="big mid">${esc(riskLabel(card.risk))}</div><div class="sub">${esc(card.risk.reason)}</div></div>
   <div class="panel"><h3>Cost</h3><div class="costs"><span><span class="num">${formatUsd(cost.billed_usd)}</span> billed</span><span><span class="num">${formatUsd(cost.list_usd)}</span> at list price, not billed</span><span><span class="num">${formatTokens(tokens)}</span> tokens</span><span><span class="num">${formatMinutes(minutes)}</span> of agent time</span></div></div>
 </div>
-<div class="rec"><span class="word">${verdictLabel(card.recommend.verdict)}</span><p>${esc(card.recommend.why)}</p></div>
+<div class="rec"><span class="word">${verdictLabel(card.recommend.verdict)}</span>${confidenceLabel(card.recommend) ? `<span class="sure">${confidenceLabel(card.recommend)}</span>` : ""}<p>${esc(card.recommend.why)}</p></div>
 </div>
 <footer>Change card for ${esc(c.task)}</footer>
 </main>

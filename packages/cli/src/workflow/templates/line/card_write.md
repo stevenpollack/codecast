@@ -39,7 +39,10 @@ problem without it opens with `Drop`; any other answer goes back to the builder
 as the reader's note. Post the decision for problem $task_id, then pin your
 report with `cast state --status done -`: one plain line, then a fenced json
 block with `question` (as posted), `recommend` (`ship`, `revise` or `drop`: the
-route your first answer takes), `why` (one plain sentence), `covers` (the
+route your first answer takes), `why` (one plain sentence), `confidence` (a whole number from 0 to
+100: how likely you judge it that the person answering takes your recommended
+route; answered cards are read against it, so give the number you believe from
+the record), `covers` (the
 `sg-N` of each finding the change would have gone differently for, when the
 problem has findings) and `page` (the page's absolute path). The run computes
 the proof, the checks, the diff, the cost and the reach counted from `covers`,

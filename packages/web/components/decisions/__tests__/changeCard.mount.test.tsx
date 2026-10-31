@@ -131,6 +131,17 @@ test("a still red row says so once, and a card under its page's title names what
   await unmount();
 });
 
+test("a card that says how sure it is says it beside the verdict, in the full card and its line", async () => {
+  const sure: ChangeCard = { ...card, recommend: { ...card.recommend, confidence: 85 } };
+  const { container, unmount } = await mount(<ChangeCardView card={sure} />);
+  expect(container.querySelector("article > [data-cc-recommended]")!.textContent).toBe(`Ship recommended, 85% sure: ${card.recommend.why}`);
+  await unmount();
+  const line = await mount(<ChangeCardView card={sure} density="line" />);
+  expect(line.container.querySelector(".cc-line-verdict")!.textContent).toBe("recommends Ship, 85% sure");
+  await line.unmount();
+});
+
+
 test("a failed suite gate shows unfolded in the checks, naming its scenarios", async () => {
   const gated: ChangeCard = { ...card, checks: [...card.checks, suiteGateCheck(["handoff-keeps-owner", "dup-merge-keeps-newest"])], recommend: { verdict: "revise", why: "Two suite scenarios fail." } };
   const { container, unmount } = await mount(<ChangeCardView card={gated} />);

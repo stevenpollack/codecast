@@ -14,6 +14,7 @@ import {
   cardChecks,
   cardFailing,
   checksLabel,
+  confidenceLabel,
   reportsFailure,
   PROOF_CHECK,
   riskLabel,
@@ -217,6 +218,30 @@ describe("validateChangeCard", () => {
     expect(errorsOf(c)).toEqual([]);
     c.recommend.why = "";
     expect(errorsOf(c)).toEqual(["recommend.why: is empty"]);
+  });
+
+  it("takes a recommendation's confidence as a whole number from 0 to 100, and a card without one", () => {
+    const c = clone(sample());
+    expect(errorsOf(c)).toEqual([]);
+    for (const ok of [0, 85, 100]) {
+      c.recommend.confidence = ok;
+      expect(errorsOf(c)).toEqual([]);
+    }
+    for (const bad of [101, -1, 0.85, "85"]) {
+      c.recommend.confidence = bad;
+      expect(errorsOf(c)).toEqual(["recommend.confidence: a whole number from 0 to 100: the chance a person answers with this verdict"]);
+    }
+  });
+
+  it("says the confidence beside the verdict on the rendered card", () => {
+    const input = sampleAssemblyInput();
+    input.recommend = { ...input.recommend!, confidence: 85 };
+    const card = assembleChangeCard(input);
+    expect(card.recommend.confidence).toBe(85);
+    expect(confidenceLabel(card.recommend)).toBe("85% sure");
+    expect(renderChangeCardHtml(card)).toContain('<span class="sure">85% sure</span>');
+    expect(confidenceLabel(sample().recommend)).toBeNull();
+    expect(renderChangeCardHtml(sample())).not.toContain('class="sure"');
   });
 
   it("refuses ship while a proof check is still red or the change broke one", () => {

@@ -48,7 +48,7 @@ import { fmt } from "./colors.js";
 import { commandGroup } from "./commandGroups.js";
 import { readTaskPulseFor } from "./taskPulse.js";
 import { readCardFile } from "./cardFile.js";
-import { CARD_DECISION_OPTIONS, cardVerdictIndexes, type ChangeCard } from "@codecast/shared/contracts/changeCard";
+import { CARD_DECISION_OPTIONS, cardVerdictIndexes, verdictOfOption, type ChangeCard, type ChangeVerdict } from "@codecast/shared/contracts/changeCard";
 
 export interface DecideOption {
   label: string;
@@ -439,6 +439,36 @@ export function formatAnsweredList(rows: AnsweredRow[]): string {
     .join("\n");
 }
 
+/** The confidence bands a calibration readout groups answered cards into. */
+const CONFIDENCE_BANDS: ReadonlyArray<[number, number]> = [[0, 49], [50, 69], [70, 79], [80, 89], [90, 99], [100, 100]];
+
+/** The route an answer took: a card's answer that opens with neither Ship nor Drop goes back to the build, as a Revise. */
+export const answeredVerdict = (r: AnsweredRow): ChangeVerdict => verdictOfOption(r.answer_label) ?? "revise";
+
+/**
+ * Whether the cards' confidence can be trusted: answered cards grouped by the
+ * confidence their author gave, each band with how many people answered as
+ * recommended. A band whose rate sits near its confidence is calibrated.
+ */
+export function formatCalibration(rows: AnsweredRow[]): string {
+  const scored = rows.filter((r) => typeof r.recommended?.confidence === "number");
+  const unscored = rows.filter((r) => r.recommended && typeof r.recommended.confidence !== "number").length;
+  if (scored.length === 0) return `No answered card carries a confidence yet${unscored ? ` (${unscored} recommended without one)` : ""}.`;
+  const lines = ["confidence  cards  answered as recommended"];
+  for (const [lo, hi] of CONFIDENCE_BANDS) {
+    const band = scored.filter((r) => r.recommended!.confidence! >= lo && r.recommended!.confidence! <= hi);
+    if (!band.length) continue;
+    const agreed = band.filter((r) => answeredVerdict(r) === r.recommended!.verdict).length;
+    const label = lo === hi ? `${lo}%` : `${lo}-${hi}%`;
+    lines.push(`${label.padEnd(10)}  ${String(band.length).padStart(5)}  ${agreed} (${Math.round((100 * agreed) / band.length)}%)`);
+  }
+  const agreed = scored.filter((r) => answeredVerdict(r) === r.recommended!.verdict).length;
+  const said = Math.round(scored.reduce((n, r) => n + r.recommended!.confidence!, 0) / scored.length);
+  lines.push(`all         ${String(scored.length).padStart(5)}  ${agreed} (${Math.round((100 * agreed) / scored.length)}%), against ${said}% said on average`);
+  if (unscored) lines.push(`${unscored} more recommended without a confidence.`);
+  return lines.join("\n");
+}
+
 export interface AnsweredRow {
   id: string;
   short_id?: string;
@@ -448,6 +478,8 @@ export interface AnsweredRow {
   answer_text?: string;
   answered_by?: { kind: string; name?: string };
   resolved_at?: number;
+  /** The card's recommendation and its author's confidence, on cards that carry one. */
+  recommended?: { verdict: ChangeVerdict; confidence?: number };
   task: { short_id: string; title: string; status: string; project?: string };
 }
 
@@ -462,6 +494,20 @@ async function listAnsweredSince(deps: PublishDeps, options: any): Promise<void>
   if (ws.kind !== "team") fail("--answered-since reads a team's cards: pass --team <name|id>.");
   const limit = options.limit !== undefined ? Number(options.limit) : undefined;
   if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) fail("--limit must be a positive whole number.");
+  if (options.calibration) {
+    // Every answer in the window, page by page on the reply's cursor.
+    const rows: AnsweredRow[] = [];
+    for (let cursor = since; ;) {
+      const page = await decideApi(deps, { action: "ls", answered_since: cursor, team_id: ws.teamId, limit: 100 });
+      const got: AnsweredRow[] = page.decisions ?? [];
+      rows.push(...got);
+      if (!got.length || page.cursor === undefined || page.cursor === cursor) break;
+      cursor = page.cursor;
+    }
+    if (options.json) console.log(JSON.stringify({ decisions: rows }, null, 2));
+    else console.log(formatCalibration(rows));
+    return;
+  }
   const result = await decideApi(deps, { action: "ls", answered_since: since, team_id: ws.teamId, limit });
   const rows: AnsweredRow[] = result.decisions ?? [];
   if (options.json) console.log(JSON.stringify({ decisions: rows, cursor: result.cursor ?? since }, null, 2));
@@ -639,6 +685,7 @@ export function registerDecideCommand(program: Command, deps: PublishDeps): void
     .option("--answered-since <time>", "ls: the cards answered on a team's tasks after a time (epoch ms, ISO time, or 30m/24h/7d ago), oldest first; no session needed")
     .option("--team <name|id>", "ls --answered-since: the team (default: the active one)")
     .option("-n, --limit <n>", "ls --answered-since: rows per page (default 50, at most 100)")
+    .option("--calibration", "ls --answered-since: whether the cards' confidence holds, every answer in the window grouped by the confidence its card gave")
     .option("--note <text>", stdinText("recommend / pass / escalate: what the person should know that the card does not say (escalate needs one)"))
     .option("--form <k=v>", "answer: a form field value (repeatable)", (val: string, acc: string[]) => [...acc, val], [] as string[])
     .option("--for-human", "answer: from a session, answer as your human. Only when they explicitly told you in this conversation to answer this decision, or agreed to this choice; never on your own judgment")

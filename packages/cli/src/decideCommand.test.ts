@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { parseDecideOption, pickDecisionTarget, looksLikeDecisionId, describeResolution, formatDecisionList, formatAge, formatSpan, isStaleDecision, parseAnswerSpec, parseDecideSpec, parseOptionBodyArg, parseOptionPageArg, pageRefToSlug, attachOptionPages, parseAnsweredSince, formatAnsweredList, type DecideOption, type DecisionRow } from "./decideCommand.js";
+import { parseDecideOption, pickDecisionTarget, looksLikeDecisionId, describeResolution, formatDecisionList, formatAge, formatSpan, isStaleDecision, parseAnswerSpec, parseDecideSpec, parseOptionBodyArg, parseOptionPageArg, pageRefToSlug, attachOptionPages, parseAnsweredSince, formatAnsweredList, formatCalibration, answeredVerdict, type DecideOption, type DecisionRow } from "./decideCommand.js";
 
 describe("cast decide option parsing", () => {
   it("keeps a bare label as a label", () => {
@@ -426,5 +426,39 @@ describe("cast decide pass --to and escalate on the wire", () => {
   it("pass with no --to stays the role's pass up, which needs a session", async () => {
     await expect(run("pass", "sd-7", "--note", "up")).rejects.toThrow("exit 1");
     expect(calls).toEqual([]);
+  });
+});
+
+describe("the cards' confidence against their answers", () => {
+  const row = (answer_label: string, verdict: "ship" | "revise" | "drop", confidence?: number) => ({
+    id: answer_label, question: "q", options: [], answer_label,
+    recommended: { verdict, ...(confidence !== undefined ? { confidence } : {}) },
+    task: { short_id: "ct-1", title: "t", status: "open" },
+  });
+
+  it("an answer that opens with neither Ship nor Drop is the Revise route", () => {
+    expect(answeredVerdict(row("Ship it: raisers stay their own list", "ship"))).toBe("ship");
+    expect(answeredVerdict(row("Drop it: keep one list", "drop"))).toBe("drop");
+    expect(answeredVerdict(row("Also show the investor list before shipping", "ship"))).toBe("revise");
+  });
+
+  it("groups answered cards by confidence, each band with how often people answered as recommended", () => {
+    const out = formatCalibration([
+      row("Ship it", "ship", 92), row("Ship it", "ship", 95), row("Revise: book it", "ship", 90),
+      row("Revise: queue it", "revise", 60), row("Drop it", "revise", 55),
+      row("Ship it", "ship"),
+    ]);
+    expect(out).toBe([
+      "confidence  cards  answered as recommended",
+      "50-69%          2  1 (50%)",
+      "90-99%          3  2 (67%)",
+      "all             5  3 (60%), against 78% said on average",
+      "1 more recommended without a confidence.",
+    ].join("\n"));
+  });
+
+  it("says so while no answered card carries a confidence", () => {
+    expect(formatCalibration([row("Ship it", "ship")])).toBe("No answered card carries a confidence yet (1 recommended without one).");
+    expect(formatCalibration([])).toBe("No answered card carries a confidence yet.");
   });
 });

@@ -1607,8 +1607,8 @@ const ANSWERED_PAGE_MAX = 100;
  * in the team's workspace that the caller may read. Read member by member
  * through by_user_status_resolved (a card's user_id is the asking session's
  * owner, a member of the team its task routes to), never the deployment's
- * newest rows. Rows are lean, the question, the answer and the task, so a
- * page fits a small transport.
+ * newest rows. Rows are lean, the question, the answer, the card's
+ * recommendation and the task, so a page fits a small transport.
  */
 export async function listAnsweredSinceCore(
   ctx: Ctx,
@@ -1680,6 +1680,10 @@ export async function listAnsweredSinceCore(
           ? { kind: "user", name: await nameOf("users", String(r.resolved_by)) }
           : undefined,
       resolved_at: r.resolved_at,
+      // What the card's author recommended, and how sure it said it was, so a reader can check the confidence against the answers.
+      ...(r.card?.recommend?.verdict
+        ? { recommended: { verdict: r.card.recommend.verdict, ...(typeof r.card.recommend.confidence === "number" ? { confidence: r.card.recommend.confidence } : {}) } }
+        : {}),
       task: { short_id: task.short_id, title: task.title, status: task.status, project: await nameOf("projects", task.project_id ? String(task.project_id) : undefined) },
     });
   }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { authorReach, caseNotLive, countedReach, mergeTreeConflicts, parseShortstat, problemFacts, proposalProof, runCost, taskWorkspaceScope } from "./cardCommand.js";
+import { authorConfidence, authorReach, caseNotLive, countedReach, mergeTreeConflicts, parseShortstat, problemFacts, proposalProof, runCost, taskWorkspaceScope } from "./cardCommand.js";
 
 describe("cast card build inputs", () => {
   test("parses git diff --shortstat in every plural form", () => {
@@ -36,6 +36,14 @@ describe("cast card build inputs", () => {
     expect(authorReach({ recommend: "drop", why: "x" }, problem)).toBeNull();
     // A written reach still wins over bare covers.
     expect(authorReach({ ...words, reach: { conversations: 9, of: 9, covers: ["sg-3"] } }, problem)).toMatchObject({ conversations: 1, of: 2, covers: ["sg-3"] });
+  });
+
+  test("a presenting station's confidence reaches the card, and a flag of the same name wins", () => {
+    const words = { recommend: "ship", why: "It answers both.", covers: ["sg-1"], confidence: 85 };
+    expect(authorConfidence(undefined, words)).toBe(85);
+    expect(authorConfidence("60", words)).toBe(60);
+    expect(authorConfidence(undefined, { ...words, confidence: undefined })).toBeUndefined();
+    expect(authorConfidence(undefined, { ...words, confidence: "high" })).toBe("high" as any);
   });
 
   test("a card's reach is counted from the record, not by its author", () => {

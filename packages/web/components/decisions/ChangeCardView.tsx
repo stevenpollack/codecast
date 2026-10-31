@@ -15,6 +15,7 @@ import {
   costUsd,
   evalsOwed,
   honestChecks,
+  confidenceLabel,
   proofSummary,
   riskLabel,
   verdictLabel,
@@ -778,7 +779,7 @@ function ChangeCardFull({ card, inline, head, recommend, outcome, animate, summa
       {/* The author's tour of the code (ct-57527), read just before the verdict. */}
       {guide && guide.steps.length > 0 && <ChangeGuideWalkthrough guide={guide} compact={inline} className="cc-section" />}
 
-      {outcome ?? (recommend && <RecommendCaption verdict={card.recommend.verdict} why={card.recommend.why} />)}
+      {outcome ?? (recommend && <RecommendCaption verdict={card.recommend.verdict} why={card.recommend.why} confidence={card.recommend.confidence} />)}
     </article>
   );
 }
@@ -791,20 +792,22 @@ function ChangeCardFull({ card, inline, head, recommend, outcome, animate, summa
  * not.
  */
 /** `afterEvals`: a Ship recommended while an eval the change owes is unscored reads "Ship after evals". */
-export function RecommendCaption({ verdict, why, reasons, afterEvals = false }: { verdict: ChangeVerdict; why?: string; reasons?: string[]; afterEvals?: boolean }) {
+export function RecommendCaption({ verdict, why, reasons, afterEvals = false, confidence }: { verdict: ChangeVerdict; why?: string; reasons?: string[]; afterEvals?: boolean; confidence?: number }) {
   const lead = verdict === "ship" && afterEvals ? "Ship after evals" : verdictLabel(verdict);
+  const sure = confidenceLabel({ confidence });
+  const recommended = `${lead} recommended${sure ? `, ${sure}` : ""}`;
   // A verdict against shipping reads as the checks that hold it back, its sentence a hover away.
   if (reasons?.length) {
     return (
       <p className={`cc-why cc-tone-${VERDICT_TONE[verdict] ?? "blue"}`} data-cc-recommended title={why}>
-        <span className="cc-why-lead">{lead} recommended</span>
+        <span className="cc-why-lead">{recommended}</span>
         {reasons.map((r) => <span key={r} className="cc-why-chip">{r}</span>)}
       </p>
     );
   }
   return (
     <p className={`cc-why cc-tone-${VERDICT_TONE[verdict] ?? "blue"}`} data-cc-recommended data-cc-after-evals={verdict === "ship" && afterEvals ? "" : undefined}>
-      <span className="cc-why-lead">{lead} recommended{why ? ":" : "."}</span>
+      <span className="cc-why-lead">{recommended}{why ? ":" : "."}</span>
       {why && <> {why}</>}
     </p>
   );
@@ -902,7 +905,7 @@ function ChangeCardLine({ card, recommend, story, folded = false, dots = true }:
           // A folded card keeps the proof; checks and risk are said when it opens.
           ...(checks.length && !folded ? [{ key: "checks", className: `cc-nowrap ${checksOk ? "text-sol-text-muted cc-line-quiet" : "cc-text-red"}`, node: checksLabel(checks) }] : []),
           ...(folded ? [] : [{ key: "risk", className: `cc-nowrap ${card.risk.class === "low" ? "text-sol-text-dim" : `cc-text-${riskTone}`}`, title: card.risk.reason ? `${riskLabel(card.risk)}: ${riskReason(card.risk)}` : riskLabel(card.risk), node: <span className="cc-line-risk" data-cc-line-risk><span className={`cc-risk-dot cc-tone-${riskTone}`} aria-hidden />{riskLabel(card.risk, true)}</span> }]),
-          ...(recommend ? [{ key: "verdict", plain: true, end: true, node: <span className={`cc-line-verdict cc-tone-${tone}`}>recommends {verdictLabel(card.recommend.verdict)}</span> }] : []),
+          ...(recommend ? [{ key: "verdict", plain: true, end: true, node: <span className={`cc-line-verdict cc-tone-${tone}`}>recommends {verdictLabel(card.recommend.verdict)}{confidenceLabel(card.recommend) ? `, ${confidenceLabel(card.recommend)}` : ""}</span> }] : []),
         ]}
       />
     </div>
@@ -1088,7 +1091,7 @@ export function ChangeCardAnswer({
     <div className={`change-card-answer ${line ? "is-line" : ""}`} data-card-answer>
       {/* Which is recommended, and on a full surface why, in one muted line
           above the row; the button itself wears only a ring. */}
-      {showCaption && <RecommendCaption verdict={recommended!} why={compact ? undefined : why} reasons={recommended !== "ship" && decision.card && decision.card.recommend.source !== "evidence" ? holdReasons(decision.card) : undefined} afterEvals={!!decision.card && !decision.trial && evalsOwed(decision.card)} />}
+      {showCaption && <RecommendCaption verdict={recommended!} why={compact ? undefined : why} reasons={recommended !== "ship" && decision.card && decision.card.recommend.source !== "evidence" ? holdReasons(decision.card) : undefined} afterEvals={!!decision.card && !decision.trial && evalsOwed(decision.card)} confidence={decision.card?.recommend.confidence} />}
       {(wentAhead || current) && !line && (
         <p className="cc-course" data-cc-course>
           {wentAhead ? <>The agent went ahead with <span className="cc-course-verdict">{verdictLabel(wentAhead)}</span>. Pick another to change course.</> : <>{record ? `${record}. ` : ""}Pick another to change course.</>}
