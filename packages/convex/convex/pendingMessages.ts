@@ -16,7 +16,7 @@ import { ackAssignmentOnEngage, addSessionOwnerRow, conversationHasHumanStarter,
 import { requireUser } from "./lib/auth";
 import { runLocalCommand } from "./localFirstCommands";
 import { insertEnqueuedPendingMessage, releaseQueuedRows, reviveConversationOnDelivery } from "./pendingMessageWrites";
-import { clearedThreadStateFields, formatUserMessage, hasThreadState, HEARTBEAT_ALIVE_MS, isHostedAgentType, isReviveClientId, isStashHidden, SETTLE_VERDICT_STATUSES, formatSessionMessage } from "@codecast/shared/contracts";
+import { answeredThreadStateFields, formatUserMessage, hasThreadState, HEARTBEAT_ALIVE_MS, isHostedAgentType, isReviveClientId, isStashHidden, SETTLE_VERDICT_STATUSES, formatSessionMessage } from "@codecast/shared/contracts";
 import { autoRecoveryEnabled, listOnlineDevices } from "./ccAccountsShared";
 import { resolveOwnerDeviceView } from "./devices";
 import {
@@ -551,9 +551,10 @@ export async function enqueuePendingMessage(
   // declaration has been answered and comes down with the send: a "Complete"
   // or "Needs input" pin standing over a thread the human just wrote into
   // would be the stale claim the whole feature exists to avoid. The agent
-  // declares again when it ends the turn. A session's relay and a trigger's
-  // wake leave it standing — nobody answered anything. The web store clears
-  // the same four fields on its draft so the panel drops before this lands.
+  // declares again when it ends the turn. A station's report stays: its run
+  // may not have read it yet. A session's relay and a trigger's wake leave the
+  // pin standing — nobody answered anything. The web store clears the same
+  // four fields on its draft so the panel drops before this lands.
   const answersThreadState = fields.human === true && hasThreadState(conversation);
   await ctx.db.patch(conversation._id, {
     updated_at: Date.now(),
@@ -563,7 +564,7 @@ export async function enqueuePendingMessage(
     ...(conversation.inbox_stashed_at && !(machineWake && isStashHidden(conversation)) ? { inbox_stashed_at: undefined } : {}),
     ...(conversation.inbox_killed_at ? { inbox_killed_at: undefined } : {}),
     ...(!machineWake && conversation.inbox_snoozed_until ? { inbox_snoozed_until: undefined } : {}),
-    ...(answersThreadState ? clearedThreadStateFields() : {}),
+    ...(answersThreadState ? answeredThreadStateFields() : {}),
     // New input opens a new turn, which owes its own report (workerSettle.ts).
     ...(conversation.reported_to_parent_at ? { reported_to_parent_at: undefined } : {}),
   });

@@ -516,6 +516,7 @@ import type * as sessionFlowsSchema from "../sessionFlowsSchema.js";
 import type * as sessionGuests from "../sessionGuests.js";
 import type * as sessionIcons from "../sessionIcons.js";
 import type * as sessionImages from "../sessionImages.js";
+import type * as sessionIndex from "../sessionIndex.js";
 import type * as sessionInitiator from "../sessionInitiator.js";
 import type * as sessionInsights from "../sessionInsights.js";
 import type * as sessionLaunch from "../sessionLaunch.js";
@@ -1114,6 +1115,7 @@ declare const fullApi: ApiFromModules<{
   sessionGuests: typeof sessionGuests;
   sessionIcons: typeof sessionIcons;
   sessionImages: typeof sessionImages;
+  sessionIndex: typeof sessionIndex;
   sessionInitiator: typeof sessionInitiator;
   sessionInsights: typeof sessionInsights;
   sessionLaunch: typeof sessionLaunch;

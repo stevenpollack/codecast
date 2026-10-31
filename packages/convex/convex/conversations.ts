@@ -5287,6 +5287,10 @@ export const updateTitle = mutation({
     // names (`replaces`), never one a person gave it.
     title_is_custom: v.optional(v.boolean()),
     replaces: v.optional(v.array(v.string())),
+    // The local agent's own guess (Claude Code's ai-title): fills the title
+    // only while no title pass has run (a pass always writes a subtitle), so it
+    // replaces the opening-prompt placeholder and yields to a generated title.
+    agent_guess: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const conversation = await ctx.db.get(args.conversation_id);
@@ -5305,7 +5309,9 @@ export const updateTitle = mutation({
       throw new Error("Unauthorized: can only update your own conversations");
     }
 
-    const replaceable = !conversation.title_is_custom || (!!conversation.title && !!args.replaces?.includes(conversation.title));
+    const replaceable = args.agent_guess
+      ? !conversation.title_is_custom && conversation.subtitle === undefined
+      : !conversation.title_is_custom || (!!conversation.title && !!args.replaces?.includes(conversation.title));
     const changed = replaceable && (conversation.title !== args.title || (!!args.title_is_custom && !conversation.title_is_custom));
     if (changed) {
       await ctx.db.patch(args.conversation_id, {
@@ -12130,6 +12136,7 @@ export async function performSetThreadState(
     // Every write replaces the result, so a later state never carries an
     // earlier station's report.
     thread_state_result: result ?? undefined,
+    thread_state_result_at: result ? at : undefined,
   });
   // A `blocked` declaration from a HIDDEN session is a claim on the user's
   // eyes — the same claim `cast trigger complete --needs-attention` makes,
@@ -12243,7 +12250,10 @@ export const getThreadState = query({
       state: conv.thread_state ?? null,
       status: conv.thread_state_status ?? null,
       result: conv.thread_state_result ?? null,
-      at: conv.thread_state_at ?? null,
+      // When the pin was written, or, once a person's message took it down,
+      // when the report still standing was: a run reads a report as its hand's
+      // answer only when it is newer than the one it sent the hand back with.
+      at: conv.thread_state_at ?? (conv.thread_state_result ? conv.thread_state_result_at : undefined) ?? null,
       msg_count_at_write: conv.thread_state_msg_count ?? null,
       message_count: conv.message_count ?? 0,
       // The session's filing, for the daemon's trigger scheduler: a machine

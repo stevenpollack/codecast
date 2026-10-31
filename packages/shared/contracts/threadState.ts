@@ -205,10 +205,6 @@ export function hasThreadState(fields: ThreadStateFields | null | undefined): bo
   return !!fields?.thread_state && fields.thread_state.trim().length > 0;
 }
 
-/** The patch that takes a pinned state down: all four fields unset together,
- * so no writer can leave a status or a count behind without its text. Used by
- * `cast state clear`, by the enqueue of a human's message (the declaration of
- * who acts next has been answered), and by the web store's optimistic clear. */
 /** Longest result kept beside a state: a station's report, not a transcript. */
 export const THREAD_STATE_RESULT_MAX_CHARS = 32_000;
 
@@ -276,18 +272,32 @@ function withoutJsonBlocks(text: string): string {
   return (out + text.slice(at)).replace(/```json[\s\S]*$/, "");
 }
 
-export function clearedThreadStateFields(): {
+/** The patch a person's message makes: it answers the pin's declaration of
+ * who acts next, so the four declaration fields go down together and no
+ * writer can leave a status or a count behind without its text. A station's
+ * report stays, with its time: it is its run's input, and a run that had not
+ * read it yet would wait out its time limit for a report its hand already gave
+ * (ct-74240, ct-61100). Used by the enqueue of a human's message and by the
+ * web store's optimistic copy of that send. */
+export function answeredThreadStateFields(): {
   thread_state: undefined;
   thread_state_at: undefined;
   thread_state_msg_count: undefined;
   thread_state_status: undefined;
-  thread_state_result: undefined;
 } {
   return {
     thread_state: undefined,
     thread_state_at: undefined,
     thread_state_msg_count: undefined,
     thread_state_status: undefined,
-    thread_state_result: undefined,
   };
+}
+
+/** The patch that takes a pinned state down whole, its report included: the
+ * session withdrawing what it said (`cast state clear`). */
+export function clearedThreadStateFields(): ReturnType<typeof answeredThreadStateFields> & {
+  thread_state_result: undefined;
+  thread_state_result_at: undefined;
+} {
+  return { ...answeredThreadStateFields(), thread_state_result: undefined, thread_state_result_at: undefined };
 }

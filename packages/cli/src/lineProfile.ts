@@ -65,7 +65,7 @@ export class LineProfileError extends Error {
 /** The values a profile file sets; anything absent takes the default. */
 export type LineProfileValues = Omit<{ [K in keyof LineProfile]?: LineProfile[K] }, "commands" | "caps" | "merge" | "deploy"> & {
   commands?: { [K in keyof LineProfile["commands"]]?: string };
-  caps?: { cards?: number };
+  caps?: { cards?: number; stations?: Record<string, number> };
   merge?: Partial<NonNullable<LineProfile["merge"]>>;
   deploy?: Partial<NonNullable<LineProfile["deploy"]>>;
 };
@@ -150,9 +150,17 @@ export function parseLineProfileText(textIn: string, file?: string): { values: L
     }
     if (line.caps !== undefined) {
       if (!isTable(line.caps)) throw new LineProfileError("[line.caps] must be a table");
-      refuseUnknown(line.caps, CAPS_KEYS, "[line.caps]");
+      refuseUnknown(line.caps, [...CAPS_KEYS, "stations"], "[line.caps]");
       values.caps = {};
       if (line.caps.cards !== undefined) values.caps.cards = count(line.caps.cards, "[line.caps] cards");
+      if (line.caps.stations !== undefined) {
+        if (!isTable(line.caps.stations)) throw new LineProfileError("[line.caps.stations] must be a table: a station id = the most runs it takes at once");
+        values.caps.stations = {};
+        for (const [id, n] of Object.entries(line.caps.stations)) {
+          if (!/^[a-z][a-z0-9_]*$/.test(id)) throw new LineProfileError(`[line.caps.stations] "${id}" is not a station id`);
+          values.caps.stations[id] = count(n, `[line.caps.stations] ${id}`);
+        }
+      }
     }
     if (line.merge !== undefined) {
       if (!isTable(line.merge)) throw new LineProfileError("[line.merge] must be a table");
@@ -247,7 +255,10 @@ export function resolveLineProfile(values: LineProfileValues, opts: { root?: str
       eval: pick("commands.eval", values.commands?.eval, d.commands.eval),
       ship: pick("commands.ship", values.commands?.ship, d.commands.ship),
     },
-    caps: { cards: pick("caps.cards", values.caps?.cards, d.caps.cards) },
+    caps: {
+      cards: pick("caps.cards", values.caps?.cards, d.caps.cards),
+      ...(values.caps?.stations ? { stations: pick("caps.stations", values.caps.stations, {}) } : {}),
+    },
     merge: {
       auto: pick("merge.auto", values.merge?.auto, d.merge!.auto),
       method: pick("merge.method", values.merge?.method, d.merge!.method),
@@ -336,6 +347,7 @@ export function lineProfileVars(profile: LineProfile): Record<string, string> {
     "line.watch_days": String(profile.watch_days),
     "line.caps.cards": String(profile.caps.cards),
   };
+  for (const [id, n] of Object.entries(profile.caps.stations ?? {})) vars[`line.caps.stations.${id}`] = String(n);
   for (const k of COMMAND_KEYS) vars[`line.commands.${k}`] = profile.commands[k] ?? "";
   return vars;
 }
@@ -352,6 +364,7 @@ export function formatLineProfile(r: ResolvedLineProfile): string {
     ["watch_days", String(p.watch_days)],
     ...COMMAND_KEYS.map((k): [string, string] => [`commands.${k}`, p.commands[k] ?? "(none)"]),
     ["caps.cards", String(p.caps.cards)],
+    ...Object.entries(p.caps.stations ?? {}).map(([id, n]): [string, string] => [`caps.stations.${id}`, `${n} at once`]),
     ["merge.auto", String(p.merge?.auto ?? false)],
     ["merge.method", p.merge?.method ?? "squash"],
     ["deploy.command", p.deploy?.command ?? "(none: the line stops at Ship)"],

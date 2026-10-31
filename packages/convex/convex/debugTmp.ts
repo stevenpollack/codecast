@@ -110,6 +110,11 @@ export const inspectConversation = internalQuery({
         active_plan_id: (conversation as any).active_plan_id,
         owner_device_id: (conversation as any).owner_device_id,
         project_path: conversation.project_path,
+        // The pin and the station report beside it: a run routes on the report.
+        thread_state_status: conversation.thread_state_status,
+        thread_state_at: conversation.thread_state_at,
+        thread_state_result: conversation.thread_state_result?.slice(0, 300),
+        thread_state_result_at: conversation.thread_state_result_at,
       },
       now: Date.now(),
       sessionOwners: ownerRows.map((r) => ({

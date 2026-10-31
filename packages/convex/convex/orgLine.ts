@@ -8,7 +8,7 @@ import { readinessLookups } from "./lib/taskGraph";
 import type { Id } from "./_generated/dataModel";
 import { resolveScope } from "./org";
 import { capsFor, countersFor, utcDay } from "./lib/orgCaps";
-import { flowAdmits, flowHands, flowHold, liveFlowFor, planLiveFlow } from "./liveFlows";
+import { flowAdmits, flowHands, liveFlowFor, planLiveFlow } from "./liveFlows";
 import { atCap } from "@codecast/shared/contracts/orgCapacity";
 import { recordHandStart } from "./spawn";
 import { insertTaskComment, moveTaskStatus } from "./tasks";
@@ -506,8 +506,9 @@ const QUEUED_RESUMES_READ = 200;
 /**
  * Failed runs queued to resume (cast workflow resume --queue), oldest first, each on its own machine while that
  * machine has a free slot. They plan before any new start in the pass and take its slots: finishing work comes before
- * starting it. A team whose live flow is off or held resumes nothing, as it starts nothing. Only a machine that offers
- * the line's checkout (a pool slot) takes a queued resume.
+ * starting it. A team whose live flow is off resumes nothing, as it starts nothing; a hold is for the flow's new runs, so
+ * work queued to resume goes on through one. Only a machine that offers the line's checkout (a pool slot) takes a
+ * queued resume.
  */
 async function planQueuedResumes(ctx: Ctx, now: number, roles: any[], loads: LineLoads, featureOn: Map<string, boolean>, flowsByTeam: Map<string, any>): Promise<Array<{ run_id: string; device: string }>> {
   const queued: any[] = await ctx.db.query("workflow_runs").withIndex("by_resume_queued", (q: any) => q.gt("resume_queued.since", 0)).take(QUEUED_RESUMES_READ);
@@ -517,7 +518,7 @@ async function planQueuedResumes(ctx: Ctx, now: number, roles: any[], loads: Lin
     const role = roles.find((r) => String(r._id) === String(run.org_role_id));
     if (!role || role.status !== "active" || !run.runner_device) continue;
     const flow = flowsByTeam.get(String(role.team_id ?? ""));
-    if (flow && (!flow.on || flowHold(flow, now))) continue;
+    if (flow && !flow.on) continue;
     if (!(await linesRunIn(ctx, role, featureOn))) continue;
     const load = await lineLoadFor(ctx, role, now, loads, roles);
     const slot = load.pool?.slots.find((s) => s.device === run.runner_device);

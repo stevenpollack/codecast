@@ -11479,7 +11479,7 @@ async function processSessionFilePass(
       const summaryTitle = metadata.summaryTitle;
       if (summaryTitle && titleCache[sessionId] !== summaryTitle) {
         try {
-          await syncService.updateTitle(conversationId, summaryTitle);
+          await syncService.updateAgentTitle(conversationId, summaryTitle);
           titleCache[sessionId] = summaryTitle;
           saveTitleCache(titleCache);
           log(`Updated title for session ${sessionId}: ${summaryTitle}`);
@@ -12618,7 +12618,7 @@ async function processCodexSessionPass(
       const summaryTitle = metadata.summaryTitle;
       if (summaryTitle && titleCache[sessionId] !== summaryTitle) {
         try {
-          await syncService.updateTitle(conversationId, summaryTitle);
+          await syncService.updateAgentTitle(conversationId, summaryTitle);
           titleCache[sessionId] = summaryTitle;
           saveTitleCache(titleCache);
           log(`Updated title for Codex session ${sessionId}: ${summaryTitle}`);
@@ -20914,6 +20914,15 @@ async function sweepLevelCheckouts(sessionIds: string[]): Promise<void> {
     const root = await repoRootFor(t.cwd);
     if (root) roots.add(root);
   }
+  // A line checkout follows its upstream whether or not a session works in it:
+  // its stations' scripts run there (the Wallet station's, Eval's proof tree).
+  // With every hand in a worktree nothing else levelled it, and two Union hosts
+  // stayed an hour behind a pushed pause on line Evals (Oct 30).
+  const { readLineSlots } = await import("./lineSlots.js");
+  for (const slot of readLineSlots(readConfig(), () => undefined)) {
+    const root = await repoRootFor(slot.root);
+    if (root) roots.add(root);
+  }
   if (!roots.size) return;
   const { levelOne, describeLevel } = await import("./land/levelSweep.js");
   for (const root of roots) {
@@ -23369,6 +23378,31 @@ const STARTED_PANE_FATAL_ERRORS = [
 ];
 const TRUST_PROMPT_RE = /trust this folder|safety check|Is this a project/i;
 
+// A fatal reading has to hold before a launch is given up. A login shell still
+// running its profile prints its own errors after the typed launch's echo and
+// before the shell echoes it again (a Mac profile's brew line on a Linux host:
+// "-bash: /opt/homebrew/bin/brew: No such file or directory"). Read alone, that
+// pane looked like a launch that died: a second claude took the station's
+// conversation, and the briefed hand ran unwatched until its station killed the
+// empty one (ct-61743, Oct 29). A launch that failed stays failed.
+export const STARTED_FATAL_CONFIRM_MS = 4000;
+const fatalPaneSince = new Map<string, number>();
+
+/** `state` for the pane `key`, a fatal reading counted only once it has held STARTED_FATAL_CONFIRM_MS: booting until then. */
+export function heldFatal(since: Map<string, number>, key: string, state: StartedPaneState, now: number): StartedPaneState {
+  if (state !== "fatal") {
+    since.delete(key);
+    return state;
+  }
+  const first = since.get(key) ?? now;
+  if (now - first >= STARTED_FATAL_CONFIRM_MS) {
+    since.delete(key);
+    return "fatal";
+  }
+  since.set(key, first);
+  return "booting";
+}
+
 // The pane text following the LAST place `pattern` matches, or null if it never
 // does. The last match, not the first: a TUI that repaints its whole frame
 // leaves the earlier ones in the same capture, so a rule about what is painted
@@ -23457,7 +23491,7 @@ async function probeStartedPane(entry: StartedSessionInfo, inspectPane?: (pane: 
       modes = { alternateScreen: alternate === "1", cursorVisible: cursor === "1" };
     } catch {}
   }
-  const state = classifyStartedPane(paneContent, promptReadyPattern, paneReadiness, modes);
+  const state = heldFatal(fatalPaneSince, entry.tmuxSession, classifyStartedPane(paneContent, promptReadyPattern, paneReadiness, modes), Date.now());
   if (state === "trust") {
     // Same dialog, same hazard as the resume path: "No, exit" is the default
     // highlight, so a bare Enter here quit the agent it had just started.
@@ -25160,7 +25194,7 @@ async function autoResumeSessionInner(sessionId: string, content: string, titleC
           // Scan only output below the echoed launch command — shell rc noise
           // above it must not read as an agent crash (see paneContentAfterLaunchEcho).
           const agentPane = paneContentAfterLaunchEcho(paneContent);
-          if (fatalErrors.some(e => agentPane.includes(e))) {
+          if (heldFatal(fatalPaneSince, tmuxSession, fatalErrors.some(e => agentPane.includes(e)) ? "fatal" : "booting", Date.now()) === "fatal") {
             const fatalReason = agentType === "claude" ? classifyClaudeResumeFatalReason(agentPane) : null;
             if (fatalReason) {
               resumeFatalReasons.set(sessionId, fatalReason);

@@ -5,7 +5,7 @@
 //
 //   bun packages/cli/scripts/prompt-dry-run.ts --run <dir> --prompt <file> --model <id>
 //        [--max-turns 80] [--tools Bash,Read,Write,Edit] [--guard <dir>] [--serve <dir>] [--then <file>]
-//        [--account <profile>] [--max-output-tokens N] [--claude-md <file>] [--cwd <dir>] [--read-only [--allow-port N]...]
+//        [--account <profile>] [--max-output-tokens N] [--claude-md <file>] [--seed <jsonl>] [--cwd <dir>] [--read-only [--allow-port N]...]
 //   bun packages/cli/scripts/prompt-dry-run.ts --run <dir> --prompt <file> --model <id> --call
 //        [--system <file>] [--max-output-tokens N]
 //
@@ -101,6 +101,12 @@
 // opening, since a dry run cannot hear a person, and how a standing session's
 // later wakes are replayed after its opening. A turn that fails ends the run.
 // The config dir is removed after the last turn.
+//
+// `--seed <jsonl>` opens the run inside an existing conversation: a Claude
+// Code transcript (cut at the moment under test) is copied into the private
+// config dir and the prompt file is sent as its next message (claude
+// --resume). It is how a moment deep in a real session is replayed with the
+// whole history the agent had, which a prompt file alone cannot carry.
 //
 // `--cwd <dir>` runs the agent in that directory (default: the run dir), so a
 // replayed station reads the checkout it would have read. `--read-only` makes
@@ -238,7 +244,7 @@ function refuse(message: string): never {
   process.exit(2);
 }
 if (!arg("run") || !arg("prompt") || !fs.existsSync(promptFile)) {
-  refuse("usage: prompt-dry-run.ts --run <dir> --prompt <file> --model <id> [--call [--system <file>]] [--max-output-tokens N] [--max-turns N] [--tools A,B] [--guard <dir>] [--serve <dir>] [--account <profile>] [--then <file>]... [--claude-md <file>]");
+  refuse("usage: prompt-dry-run.ts --run <dir> --prompt <file> --model <id> [--call [--system <file>]] [--max-output-tokens N] [--max-turns N] [--tools A,B] [--guard <dir>] [--serve <dir>] [--account <profile>] [--then <file>]... [--claude-md <file>] [--seed <jsonl>]");
 }
 const model = arg("model");
 if (!model || model.startsWith("--")) refuse("--model is required: an unpinned run takes the account default and cannot be compared");
@@ -258,6 +264,9 @@ const thenFiles = process.argv.flatMap((a, i) => (a === "--then" && process.argv
 for (const f of thenFiles) if (!fs.existsSync(f)) refuse(`--then: no such file ${f}`);
 const claudeMdFile = arg("claude-md") ? path.resolve(arg("claude-md")!) : undefined;
 const readOnly = process.argv.includes("--read-only");
+const seedFile = arg("seed") ? path.resolve(arg("seed")!) : undefined;
+if (seedFile && call) refuse("--seed does not apply to --call: a call is one model call with no history");
+if (seedFile && !fs.existsSync(seedFile)) refuse(`--seed: no such file ${seedFile}`);
 const agentCwd = arg("cwd") ? path.resolve(arg("cwd")!) : undefined;
 if (agentCwd && !fs.existsSync(agentCwd)) refuse(`--cwd: no such directory ${agentCwd}`);
 if (readOnly && call) refuse("--read-only does not apply to --call: a call has no tools to write with");
@@ -280,6 +289,25 @@ fs.mkdirSync(configDir, { recursive: true });
 fs.mkdirSync(noCast, { recursive: true });
 if (claudeMdFile) fs.copyFileSync(claudeMdFile, path.join(configDir, "CLAUDE.md"));
 
+/** Install the --seed transcript as a session claude can resume from the
+ *  agent's cwd: under the project dir claude derives from that cwd, with a
+ *  fresh session id so nothing points back at the original. */
+function installSeed(file: string): string {
+  const id = crypto.randomUUID();
+  const cwd = fs.realpathSync(agentCwd ?? runDir);
+  const dir = path.join(configDir, "projects", cwd.replace(/[^A-Za-z0-9]/g, "-"));
+  fs.mkdirSync(dir, { recursive: true });
+  const lines = fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => {
+    const row = JSON.parse(l);
+    if (row.sessionId) row.sessionId = id;
+    if (row.cwd) row.cwd = cwd;
+    return JSON.stringify(row);
+  });
+  fs.writeFileSync(path.join(dir, `${id}.jsonl`), lines.join("\n") + "\n");
+  return id;
+}
+const seedSession = seedFile ? installSeed(seedFile) : undefined;
+
 // A --call run has no tools, so nothing in it can write scratch or reach a
 // sign-in. An agent run without its sandbox could read the codecast sign-in
 // and write around the guard, so it does not start.
@@ -288,7 +316,7 @@ if (isolationGap) { fs.rmSync(pidFile, { force: true }); refuse(`an agent run ne
 const sandbox = call ? null : scratchSandbox(runDir, { guard: guardDir, serve: serveDir }, readOnly);
 const isolation = call ? null : "sandbox-exec";
 
-fs.writeFileSync(path.join(runDir, "args.json"), JSON.stringify({ model, call, maxOutputTokens: maxOutputTokens ? Number(maxOutputTokens) : null, tools, maxTurns: Number(maxTurns), serve: serveDir ?? null, guard: guardDir, isolation, claudeMd: claudeMdFile ?? null, cwd: agentCwd ?? null, readOnly }, null, 1) + "\n");
+fs.writeFileSync(path.join(runDir, "args.json"), JSON.stringify({ model, call, maxOutputTokens: maxOutputTokens ? Number(maxOutputTokens) : null, tools, maxTurns: Number(maxTurns), serve: serveDir ?? null, guard: guardDir, isolation, claudeMd: claudeMdFile ?? null, seed: seedFile ?? null, cwd: agentCwd ?? null, readOnly }, null, 1) + "\n");
 
 // The child env (src/subscriptionCall.ts isolatedEnv): none of the launching
 // session's identity, the login as CLAUDE_CODE_OAUTH_TOKEN alone, and
@@ -511,7 +539,7 @@ function runTurn(name: string, promptText?: string, resume?: string): Promise<{ 
   });
 }
 
-const first = await runTurn("out");
+const first = await runTurn("out", undefined, seedSession);
 let code = first.code;
 let sessionId = first.sessionId;
 for (const [i, file] of thenFiles.entries()) {

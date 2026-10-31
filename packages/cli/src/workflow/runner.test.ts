@@ -230,6 +230,26 @@ describe("workflow/runner (command nodes)", () => {
     expect(seen[1]).toContain("impl-sees-[Verify: tests-failed-in-a.test.ts]");
   });
 
+  // ct-61678 (Oct 30): a Revise note went to a hold in front of Build that the run had not passed before, the hold
+  // was told nothing, and Build would have rebuilt without the note.
+  test("a station that parks is told what sent the run there even on its first visit, and passes it on", async () => {
+    const g = parseWorkflowSource(`digraph g {
+      start  [shape=Mdiamond]
+      build  [label="Build", shape=parallelogram, max_visits=2, script="echo build-sees-[$sent_back]"]
+      revise [label="Revise, settled", shape=parallelogram, script="printf %s fix-the-read"]
+      hold   [label="Proof hold", shape=parallelogram, parks=true, script="printf %s \\"$sent_back\\""]
+      exit   [shape=Msquare]
+      start -> build
+      build -> revise [condition="build.visits < 2"]
+      build -> exit
+      revise -> hold -> build
+    }`);
+    expect(await runWorkflow(g, { cwd: tmpDir })).not.toBe("failed");
+    const seen = cap.logs.filter(l => l.includes("build-sees-") && !l.includes("$ echo"));
+    expect(seen[0]).toContain("build-sees-[]");
+    expect(seen[1]).toContain("build-sees-[Proof hold: Revise, settled: fix-the-read]");
+  });
+
   test("command node honors a per-node timeout attribute (seconds)", async () => {
     const g = parseWorkflowSource(`digraph g {
       start [shape=Mdiamond]
@@ -412,6 +432,18 @@ describe("workflow/graphToPushPayload", () => {
     expect(byId.gate).toMatchObject({ doc: "$review.output", category: "review" });
     expect(byId.start.definition).toBeUndefined();
     expect(edges.find((e) => e.from === "gate")).toEqual({ from: "gate", to: "exit", label: "[A] Approve :: ships" });
+  });
+
+  test("a station that parks says so in the push payload, and no other station does", () => {
+    const g = parseWorkflowSource(`digraph g {
+      start  [shape=Mdiamond]
+      wallet [label="Wallet", shape=parallelogram, script="true", parks=true]
+      exit   [shape=Msquare]
+      start -> wallet -> exit
+    }`);
+    const byId = Object.fromEntries(graphToPushPayload(g).nodes.map((n) => [n.id, n]));
+    expect(byId.wallet).toMatchObject({ parks: true });
+    expect("parks" in byId.start).toBe(false);
   });
 
   test("the push payload carries the graph stack, and omits it when the graph has none", () => {

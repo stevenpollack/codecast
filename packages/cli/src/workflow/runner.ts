@@ -14,6 +14,7 @@ import { contextVar, executeCommand, expandScriptVars, recordNodeOutput } from "
 import { planReadiness } from "../planReadiness.js";
 import { readGateCard } from "../cardFile.js";
 import { agentResultPreview, resultPreview } from "./chainWorkflow.js";
+import { graphEdgesPayload, graphNodesPayload } from "./graphPayload.js";
 import { spawnSync } from "../proc.js";
 import { argvOnLaunchAccount } from "../ccAccounts.js";
 import { applyUnattended } from "../unattended.js";
@@ -340,6 +341,32 @@ async function loadNodeDefinition(node: WorkflowNode, options: RunOptions): Prom
 // that lost a race on every server retry (nothing applied) is sent again with
 // backoff, whatever the route: at fifty runs a station's spawn lost to other
 // stations' writes and failed its node on the first 500 (2026-10-23).
+/**
+ * Waits for a place at a station that takes only so many of the team's runs at
+ * once (workflow_runs.admitToStation). Eval proofs that queued for one of the
+ * eval host's slots inside Eval's own clock were killed mid-draw (ct-68695, 91
+ * of 95 cases, 2026-10-29); waiting here, before the station starts, spends
+ * none of it. A server that cannot answer three asks running (one older than
+ * the route) lets the run in: a cap never stops a line it cannot count for.
+ */
+export async function waitForStationPlace(node: WorkflowNode, cap: number, options: RunOptions): Promise<void> {
+  let unanswered = 0;
+  let said = false;
+  for (;;) {
+    const r = await cliCall(options, "/cli/workflow-runs/admit", { run_id: options.runId, node_id: node.id, cap });
+    if (r?.admitted !== false) {
+      if (r || ++unanswered >= 3) {
+        if (said) console.log(`  ${c.green}a place at ${node.label} is free${c.reset}`);
+        return;
+      }
+    } else if (!said) {
+      console.log(`  ${c.dim}waiting for a place at ${node.label}: ${r.inside} of ${cap} taken${c.reset}`);
+      said = true;
+    }
+    await new Promise((res) => setTimeout(res, options.stationPollMs ?? 30_000));
+  }
+}
+
 async function cliCall(options: RunOptions, route: string, body: Record<string, any>): Promise<any | null> {
   if (!options.convexSiteUrl || !options.apiToken) return null;
   try {
@@ -948,39 +975,11 @@ export function runRegistrationIsFatal(opts: { detach?: boolean; taskId?: string
   return !!(opts.detach || opts.taskId || opts.planId);
 }
 
-// the-line.md L8 node fidelity: the one serializer for a workflow push. Every
-// node attribute the daemon needs to run the stored graph as a local run
-// would (definition, reviewer, timeout, temperature, and the gate's doc and
-// category) rides here, so a second push site cannot drop one.
+// A workflow push: the stored stations and routes (graphPayload.ts), with the
+// graph's own attributes.
 export function graphToPushPayload(graph: WorkflowGraph) {
-  const nodes = [...graph.nodes.values()].map((n) => ({
-    id: n.id, label: n.label, shape: n.shape, type: n.type,
-    ...(n.prompt ? { prompt: n.prompt } : {}),
-    ...(n.script ? { script: n.script } : {}),
-    ...(n.model ? { model: n.model } : {}),
-    ...(n.backend ? { backend: n.backend } : {}),
-    ...(n.agent ? { agent: n.agent } : {}),
-    ...(n.isolated !== undefined ? { isolated: n.isolated } : {}),
-    ...(n.reasoning_effort ? { reasoning_effort: n.reasoning_effort } : {}),
-    ...(n.max_visits !== undefined ? { max_visits: n.max_visits } : {}),
-    ...(n.max_retries !== undefined ? { max_retries: n.max_retries } : {}),
-    ...(n.retry_target ? { retry_target: n.retry_target } : {}),
-    ...(n.goal_gate !== undefined ? { goal_gate: n.goal_gate } : {}),
-    ...(n.definition ? { definition: n.definition } : {}),
-    ...(n.reviewer !== undefined ? { reviewer: n.reviewer } : {}),
-    ...(n.timeout !== undefined ? { timeout: n.timeout } : {}),
-    ...(n.temperature !== undefined ? { temperature: n.temperature } : {}),
-    ...(n.doc ? { doc: n.doc } : {}),
-    ...(n.category ? { category: n.category } : {}),
-    ...(n.card ? { card: n.card } : {}),
-    ...(n.asker ? { asker: n.asker } : {}),
-    ...(n.answerer ? { answerer: n.answerer } : {}),
-  }));
-  const edges = graph.edges.map((e) => ({
-    from: e.from, to: e.to,
-    ...(e.label ? { label: e.label } : {}),
-    ...(e.condition ? { condition: e.condition } : {}),
-  }));
+  const nodes = graphNodesPayload(graph);
+  const edges = graphEdgesPayload(graph);
   // The graph attribute stack (the-line.md L4: one decision stack per run)
   // travels with the push so a daemon run keeps it.
   return { nodes, edges, ...(graph.stack ? { stack: graph.stack } : {}), ...(graph.serves?.length ? { serves: graph.serves } : {}) };
@@ -1254,6 +1253,8 @@ export interface RunOptions {
   runSession?: string;
   /** Settle poll for session nodes (tests shorten it). */
   pollIntervalMs?: number;
+  /** How often a run waiting for a place at a capped station asks again (waitForStationPlace; tests shorten it). */
+  stationPollMs?: number;
   /** How long a resumed run waits for the hand it left to be revived (REVIVE_GRACE_MS; tests shorten it). */
   reviveGraceMs?: number;
   /** How long a presenter sent back its brief has to come back (PRESENTER_GRACE_MS; tests shorten it). */
@@ -1272,6 +1273,29 @@ export interface RunOptions {
   continueFresh?: () => Promise<void>;
   /** Set by runWorkflow when continueFresh is given: what this runner loaded (runResume.ts runnerStamp). */
   loadedStamp?: string;
+  /** The flow versions the run was pinned to when this runner loaded its graph (flowVersionsKey). */
+  loadedFlowVersions?: string;
+  /** The flow versions the run is pinned to now, or null when that cannot be read. */
+  pinnedFlowVersions?: () => Promise<string | null>;
+}
+
+/** A run's pinned flow versions as one comparable string. */
+export function flowVersionsKey(versions: ReadonlyArray<{ version_id?: unknown }> | null | undefined): string {
+  return (versions ?? []).map((v) => String(v.version_id ?? "")).join(",");
+}
+
+/**
+ * Whether the run moved onto other flow versions since this runner loaded its
+ * graph (a re-pin). Such a run goes on in a fresh runner before its next
+ * station starts, so the station and the edges out of it are the version's: a
+ * re-pin restarted only runners paused at a gate, and ct-61929's runner,
+ * loaded before the Wallet station existed, sent a wallet verdict to a
+ * founder's card twice (Oct 30).
+ */
+async function pinnedElsewhere(options: RunOptions): Promise<boolean> {
+  if (!options.continueFresh || options.loadedFlowVersions === undefined || !options.pinnedFlowVersions) return false;
+  const now = await options.pinnedFlowVersions().catch(() => null);
+  return now !== null && now !== options.loadedFlowVersions;
 }
 
 // The task fields node prompts and edge conditions read. Loaded once at start
@@ -1954,6 +1978,10 @@ async function runNodeLoop(
   let current: WorkflowNode = startNode;
 
   while (current.type !== "exit") {
+    if (await pinnedElsewhere(options)) {
+      console.log(`${c.dim}  The run moved onto a newer flow version: ${current.label} starts in a fresh runner on it${c.reset}`);
+      await options.continueFresh!();
+    }
     // ── Stage 1: Increment visit count, enforce max_visits ───────────────────
     // Fabro: checked first, before anything else. Exceeding limit = hard abort.
     // Within an attempt visit counts are never reset (even after retry_target jumps); a gate's answer starts the next.
@@ -1982,6 +2010,11 @@ async function runNodeLoop(
     // ── Stage 2: Print node header ────────────────────────────────────────────
     const icon = nodeIcon(current);
     console.log(`${c.bold}${icon} ${current.label}${c.reset}${visits > 1 ? c.dim + ` (visit ${visits})` + c.reset : ""}`);
+
+    // A station that takes only so many of the team's runs at once (the line profile's caps.stations): the run
+    // waits outside it for a place, and the station's clock starts once the place is the run's.
+    const stationCap = Number(state.context[`line.caps.stations.${current.id}`] || 0);
+    if (stationCap > 0 && options.runId && !options.dryRun) await waitForStationPlace(current, stationCap, options);
 
     // ── Stage 3: Execute node ─────────────────────────────────────────────────
     if (options.runId) {
@@ -2162,7 +2195,9 @@ async function runNodeLoop(
     // that routed here and what it said. A hand reads only what its prompt
     // names, so without this a builder sent back by a failed check could not
     // tell that round from its first and checked its own work again (ct-58757).
-    if (state.completed.includes(next.id)) state.context["sent_back"] = `${current.label}: ${state.context[`${current.id}.output`] ?? ""}`.trim();
+    // A station that parks (a hold in front of another) is told what sent the run there even on its first visit, so it
+    // can pass it on: ct-61678's Revise note was lost at a hold the run had not passed before (Oct 30).
+    if (state.completed.includes(next.id) || next.parks) state.context["sent_back"] = `${current.label}: ${state.context[`${current.id}.output`] ?? ""}`.trim();
     else delete state.context["sent_back"];
 
     checkpoint(next.id);

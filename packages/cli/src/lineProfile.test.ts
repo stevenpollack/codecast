@@ -136,6 +136,18 @@ describe("line profile (LP2)", () => {
     expect(parseLineProfileText(`[line.deploy]\ntrigger = "count"`).warnings[0]).toContain("not built yet");
   });
 
+  test("a station cap is read by station id and reaches the runner as a variable", () => {
+    const { values } = parseLineProfileText(`[line.caps]\ncards = 3\n[line.caps.stations]\neval = 8\n`);
+    const profile = resolveLineProfile(values).profile;
+    expect(profile.caps).toEqual({ cards: 3, stations: { eval: 8 } });
+    expect(lineProfileVars(profile)["line.caps.stations.eval"]).toBe("8");
+    expect(resolveLineProfile({}).profile.caps.stations).toBeUndefined();
+    const err = (t: string) => { try { parseLineProfileText(t); } catch (e) { return e as Error; } return null; };
+    expect(err(`[line.caps.stations]\neval = 0`)?.message).toContain("[line.caps.stations] eval must be a positive integer");
+    expect(err(`[line.caps.stations]\n"Eval Step" = 2`)?.message).toContain('"Eval Step" is not a station id');
+    expect(err(`[line.caps]\nstations = 4`)?.message).toContain("[line.caps.stations] must be a table");
+  });
+
   test("unknown keys are refused with where they are", () => {
     const err = (t: string) => { try { parseLineProfileText(t, ".codecast/line.toml"); } catch (e) { return e as Error; } return null; };
     expect(err(`[line]\nprojet = "X"`)?.message).toBe('.codecast/line.toml: [line] has unknown key "projet" (known: team, project, principles, prompting, size_budget, watch_days, commands, caps, merge, deploy, finders)');

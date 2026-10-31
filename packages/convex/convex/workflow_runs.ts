@@ -1115,6 +1115,8 @@ export const updateProgress = mutation({
       ...(args.graph_hash ? { graph_hash: args.graph_hash, restart_runner_at: undefined } : {}),
       ...(args.graph_nodes?.length ? { graph_nodes: args.graph_nodes } : {}),
       ...(args.runner_device ? { runner_device: args.runner_device } : {}),
+      // A place at a capped station is the run's until it reports another station or ends.
+      ...(run.station_place && (args.current_node_id !== run.station_place.node_id || args.run_status === "completed" || args.run_status === "failed") ? { station_place: undefined } : {}),
       updated_at: now,
     });
 
@@ -1438,6 +1440,34 @@ export const pollGateResponse = mutation({
 
 // The live runs a machine drives (runner_device), for its daemon's sweep:
 // one whose runner is gone there is resumed where it stands (cli runResume.ts).
+/**
+ * A place at a station that takes only so many runs at once (the line
+ * profile's caps.stations). The runner asks before the station starts, and a
+ * run refused waits outside it, the station's clock not started: Eval proofs
+ * queued for the eval host's slots inside Eval's clock, and ct-68695 was killed
+ * an hour in with 91 of 95 cases drawn (2026-10-29). Counted over the
+ * workspace's running runs holding a place there, in one transaction, so two
+ * runners asking together never both take the last one. A run that already
+ * holds the place (its runner resumed it) keeps it.
+ */
+export const admitToStation = mutation({
+  args: { api_token: v.string(), run_id: v.id("workflow_runs"), node_id: v.string(), cap: v.number() },
+  handler: async (ctx, args) => {
+    const auth = await verifyApiToken(ctx, args.api_token, false);
+    if (!auth) return { error: "Unauthorized" };
+    const run = await ctx.db.get(args.run_id);
+    if (!run || run.user_id !== auth.userId) return { error: "Not found" };
+    if (run.station_place?.node_id === args.node_id || !run.workspace) return { admitted: true };
+    const running = await ctx.db.query("workflow_runs")
+      .withIndex("by_workspace_status_updated", (q) => q.eq("workspace", run.workspace!).eq("status", "running"))
+      .collect();
+    const inside = running.filter((r) => r.station_place?.node_id === args.node_id).length;
+    if (inside >= args.cap) return { admitted: false, inside, cap: args.cap };
+    await ctx.db.patch(run._id, { station_place: { node_id: args.node_id, at: Date.now() } });
+    return { admitted: true, inside: inside + 1, cap: args.cap };
+  },
+});
+
 export const liveRunsForDevice = mutation({
   args: { api_token: v.string(), device: v.string() },
   handler: async (ctx, args) => {

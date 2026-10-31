@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AGENT_CLIENTS } from "@codecast/shared/contracts";
-import { classifyStartedPane } from "./daemon.js";
+import { classifyStartedPane, heldFatal, STARTED_FATAL_CONFIRM_MS } from "./daemon.js";
 import { CODEX_TRUST_ACCEPTED_PANE, CODEX_TRUST_PANE, GROK_TRUST_PANE } from "./test-helpers/trustDialogFrames.js";
 
 // Regression coverage for the unbound blank new session (root-caused 2026-09-02).
@@ -200,6 +200,24 @@ describe("classifyStartedPane", () => {
     const pane = `${LAUNCH_ECHO}\n-bash: /opt/homebrew/bin/brew: No such file or directory\n~/work/app (main):${LAUNCH_ECHO}\n\n Quick safety check: Is this a project you created or one you trust?\n ❯ No, exit\n`;
     expect(classifyStartedPane(pane, claudePrompt)).toBe("trust");
     expect(classifyStartedPane(`${LAUNCH_ECHO}\n-bash: x: No such file or directory\n~ $ ${LAUNCH_ECHO}\nbash: claude: command not found\n`, claudePrompt)).toBe("fatal");
+  });
+
+  // ct-61743 (Oct 29): 0.6s after launch, a host's login profile had printed its brew error after the typed
+  // launch's echo, and the shell had not echoed the launch again yet. Read alone that pane is fatal; a second
+  // claude took the station's conversation and the briefed hand ran unwatched. The reading must hold to count.
+  test("a fatal reading counts only once it holds, so profile noise before the shell's re-echo stays booting", () => {
+    const early = `${LAUNCH_ECHO}\n-bash: /opt/homebrew/bin/brew: No such file or directory\n-bash: ulimit: open files: cannot modify limit: Operation not permitted\n`;
+    expect(classifyStartedPane(early, claudePrompt)).toBe("fatal");
+    const since = new Map<string, number>();
+    expect(heldFatal(since, "cc-early", classifyStartedPane(early, claudePrompt), 1_000)).toBe("booting");
+    // The shell echoes the launch again and claude paints its prompt: ready, and the fatal clock clears.
+    const later = `${early}~/work/app (main):${LAUNCH_ECHO}\n ▐▛███▜▌   Claude Code\n❯ `;
+    expect(heldFatal(since, "cc-early", classifyStartedPane(later, claudePrompt), 1_600)).toBe("ready");
+    // A launch that really failed keeps reading fatal and is given up once the reading has held.
+    const dead = `${LAUNCH_ECHO}\nbash: claude: command not found\n`;
+    expect(heldFatal(since, "cc-dead", classifyStartedPane(dead, claudePrompt), 2_000)).toBe("booting");
+    expect(heldFatal(since, "cc-dead", classifyStartedPane(dead, claudePrompt), 2_000 + STARTED_FATAL_CONFIRM_MS)).toBe("fatal");
+    expect(since.size).toBe(0);
   });
 });
 

@@ -34,7 +34,7 @@ import { applyPersonMove, orgRoleReparentMakesCycle, personMoveApplies, personMo
 export { orgPersonReparentMakesCycle, orgRoleReparentMakesCycle } from "./orgTreeMoves";
 import { HEAD_OF_PEOPLE_HANDLE, isHeadOfPeopleRole, type OrgChangeStatus, type OrgHealth, type OrgProposalChange, type OrgProposalListRow } from "../components/org/orgStaffingTypes";
 import { andList, changeSentence, describeOrgChange, isOrgChangeApprovable, isOrgChangeDecidable, proposalReplyText, ORG_VERDICT_REVISED, type OrgChangeReply, type OrgProposalReply, type OrgReplyVerdict, type OrgTenureSpec, type OrgVerdictSeen } from "@codecast/shared/contracts/orgProposal";
-import { hasThreadState, clearedThreadStateFields, type ThreadStateFields } from "@codecast/shared/contracts";
+import { hasThreadState, answeredThreadStateFields, type ThreadStateFields } from "@codecast/shared/contracts";
 import { isConvexId } from "../lib/entityLinks";
 import { activeWorkspaceKeyOf } from "../lib/workspaceScope";
 import { leadScopeChange, type LeadScopeChange } from "@codecast/shared/contracts/orgLead";
@@ -1145,7 +1145,7 @@ function sayInThread(draft: OrgDraft, proposalId: string, items: OrgReplyInput[]
   if (!content) return;
   writeOptimisticMessage(store, say.thread, content, undefined, say.client_id);
   for (const target of [store.sessions?.[say.thread], store.conversations?.[say.thread]]) {
-    if (target && hasThreadState(target)) Object.assign(target, clearedThreadStateFields());
+    if (target && hasThreadState(target)) Object.assign(target, answeredThreadStateFields());
   }
 }
 type OrgThreadMessage = { _id: string; role: "user"; content: string; timestamp: number; _isOptimistic: true; _clientId: string; _sentBaselineTs?: number };

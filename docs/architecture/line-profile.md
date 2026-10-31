@@ -56,6 +56,9 @@ ship  = "bun outreach/backend/scripts/line.ts ship --task $task_id --branch $bra
 [line.caps]
 cards = 5                            # read by nothing: open cards limit no starts (LE6)
 
+[line.caps.stations]                 # the most of the team's running runs a station takes at once
+eval = 8                             # a run past it waits outside, the station's clock not started
+
 [line.merge]                         # what Ship does once a pull request is green
 auto = false                         # true: Ship on a task or session merges too
 method = "squash"                    # squash | merge | rebase
@@ -169,7 +172,17 @@ A card goes to the person the owning role reports to, unless the cause is in a
 protected category, where it goes to the workspace owner. A person may hold any
 number of open cards: unanswered cards never hold back a start, and
 `caps.cards` limits nothing. What a line starts is bounded by the runs working
-on its runner's machine (the-line-end-to-end.md LE6). Operational asks (a call
+on its runner's machine (the-line-end-to-end.md LE6). A station can take fewer
+at once than the line runs: `[line.caps.stations]` names each such station by
+its id and how many of the team's running runs it takes together. Before the
+station starts, the runner asks the server for a place
+(`workflow_runs.admitToStation`), counted over the workspace's running runs in
+one transaction. A run refused waits outside the station with its clock not
+started. Union's Eval needs this because its proofs share one eval host:
+queued inside Eval's clock, they were killed mid-draw (ct-68695, 2026-10-29).
+A CLI older than the key refuses the whole profile, so a project adds the
+table only once every machine running its line has a CLI that reads it.
+Operational asks (a call
 to make, a document to send) are not change cards; a recurring class of them
 is a signal.
 

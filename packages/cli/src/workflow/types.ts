@@ -40,6 +40,10 @@ export interface WorkflowNode {
   // session gets its own worktree (named after the graph and the bound task).
   agent?: string;
   isolated?: boolean;
+  // A station where the run waits on something outside it (an eval wallet's
+  // room): while a run stands here it holds no machine slot, and it counts
+  // again once it moves on (linePlacement.holdsSlot reads it from the flow).
+  parks?: boolean;
   // Command nodes that render the line's own text (Union's shared text from
   // _shared.md): re-made whenever the run resumes, so a resumed run reads the
   // text as it is now, never the copy in its checkpoint (line-versions.md LV4).

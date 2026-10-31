@@ -31,12 +31,37 @@ export async function runsWaitingOnAPerson(ctx: Ctx, runner: string): Promise<Se
  * at a blocking decision is parked (`waiting`, runsWaitingOnAPerson), and so
  * is one whose task holds an open wait (a time, a PR, a decision:
  * task-graph.md TG2): its hand sleeps until the wait clears, like a run at a
- * card, and the runner does not kill it at the node's timeout.
+ * card, and the runner does not kill it at the node's timeout. So is a run at
+ * a station its flow marks `parks` (a wait for an eval wallet's room): it takes
+ * a slot again once it moves on.
  */
 export async function holdsSlot(ctx: Ctx, run: any, waiting: Set<string>): Promise<boolean> {
   if (!(run.org_role_id || run.task_id) || waiting.has(String(run._id))) return false;
+  if (await parkedAtStation(ctx, run)) return false;
   const task = run.task_id ? await ctx.db.get(run.task_id) : null;
   return !task?.waiting_since;
+}
+
+// The stations that park in each flow version, read once: a version never
+// changes, and its snapshot is the whole flow, too large to read per run.
+const parkingStations = new Map<string, Set<string>>();
+
+/** Whether `run` stands at a station that parks in a flow version it is pinned to. */
+async function parkedAtStation(ctx: Ctx, run: any): Promise<boolean> {
+  if (!run.current_node_id) return false;
+  for (const fv of run.flow_versions ?? []) {
+    const key = String(fv.version_id);
+    let parks = parkingStations.get(key);
+    if (!parks) {
+      const id = ctx.db.normalizeId?.("workflow_versions", key) ?? key;
+      const version = await ctx.db.get(id);
+      if (!version) continue;
+      parks = new Set((version.snapshot?.nodes ?? []).filter((n: any) => n.parks).map((n: any) => String(n.id)));
+      parkingStations.set(key, parks);
+    }
+    if (parks.has(String(run.current_node_id))) return true;
+  }
+  return false;
 }
 
 /** The runs a device's line slot takes at once: none while an operator holds the device (linePool.holdLine). */

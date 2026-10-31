@@ -246,6 +246,31 @@ describe("liveFlows (one live flow per team)", () => {
     // All four of Deals' machine slots hold parked runs, so its next problem still starts.
     expect((await sweepCore(ctx, NOW)).started.map((st) => st.task_id)).toEqual(["tasks_d90"]);
   });
+
+  // Oct 29: every running run on one of Union's hosts sat at the Wallet station waiting for the eval wallet's
+  // room, holding all of its slots while builds queued behind them.
+  test("a run at a station its flow marks parks holds no machine slot, and takes one again once it moves on", async () => {
+    const version = {
+      _id: "workflow_versions_parks", workflow_id: "workflows_spine", graph_hash: "hp", nodes: [], changed: [], by: HOST, at: 1,
+      snapshot: { name: "agentwatch", source: "digraph a {}", file: "agentwatch.cast", files: [], edges: [], nodes: [
+        { id: "eval", label: "Eval", shape: "parallelogram", type: "tool" },
+        { id: "eval_wallet", label: "Wallet", shape: "parallelogram", type: "tool", parks: true },
+      ] },
+    };
+    const at = (node: string) => Array.from({ length: LINE_RUNS_PER_RUNNER }, (_, n) => ({
+      _id: `workflow_runs_w${n}`, user_id: MATE, status: "running", org_role_id: "org_roles_deals", task_id: `tasks_w${n}`, current_node_id: node,
+      flow_versions: [{ version_id: version._id, workflow_id: "workflows_spine" }], node_statuses: [],
+    }));
+    const setup = (node: string) => {
+      const runs = at(node);
+      const tasks = runs.map((r) => problem(r.task_id.slice("tasks_".length), "deals", 10, { status: "in_progress" }));
+      return fixtures({ tasks: [problem("d90", "deals", 90), ...tasks], extra: { workflow_runs: runs, workflow_versions: [version] } });
+    };
+    // All of Deals' slots are runs waiting at Wallet, so its next problem starts.
+    expect((await sweepCore(setup("eval_wallet").ctx, NOW)).started.map((st) => st.task_id)).toEqual(["tasks_d90"]);
+    // Back at Eval they take their slots again, and nothing new starts for Deals.
+    expect((await sweepCore(setup("eval").ctx, NOW)).started).toEqual([]);
+  });
 });
 
 // Which graph a live flow's run takes (lib/flowRoute, workflows.lineRouteFor):

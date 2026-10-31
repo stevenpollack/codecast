@@ -4947,6 +4947,7 @@ cliRoute("/cli/mods/get-call", async (ctx, body) => ctx.runQuery((api as any).mo
 cliRoute("/cli/workflow-runs/create", async (ctx, body) => ctx.runMutation(api.workflow_runs.createFromCli, body));
 cliRoute("/cli/workflow-runs/get", async (ctx, body) => ctx.runMutation(api.workflow_runs.getForDaemon, body));
 cliRoute("/cli/workflow-runs/progress", async (ctx, body) => ctx.runMutation(api.workflow_runs.updateProgress, body));
+cliRoute("/cli/workflow-runs/admit", async (ctx, body) => ctx.runMutation(api.workflow_runs.admitToStation, body));
 cliRoute("/cli/workflow-runs/gate", async (ctx, body) => ctx.runMutation(api.workflow_runs.pauseAtGate, body));
 cliRoute("/cli/workflow-runs/poll-gate", async (ctx, body) => ctx.runMutation(api.workflow_runs.pollGateResponse, body));
 cliRoute("/cli/workflow-runs/live-on-device", async (ctx, body) => ctx.runMutation(api.workflow_runs.liveRunsForDevice, body));
@@ -5205,6 +5206,7 @@ cliRoute("/cli/accounts/recovery-status", async (ctx, body) => ctx.runQuery(api.
 
 import {
   publish as artifactPublish,
+  upload as artifactUpload,
   serve as artifactServe,
   unlock as artifactUnlock,
   emailUnlock as artifactEmailUnlock,
@@ -5227,6 +5229,7 @@ const artifactPost = (path: string, handler: typeof artifactPublish) => {
 };
 
 artifactPost("/cli/artifacts/publish", artifactPublish);
+artifactPost("/cli/artifacts/upload", artifactUpload);
 artifactPost("/cli/artifacts/unlock", artifactUnlock);
 artifactPost("/cli/artifacts/email-unlock", artifactEmailUnlock);
 artifactPost("/cli/artifacts/manage", artifactManage);

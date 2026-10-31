@@ -512,6 +512,26 @@ describe("orgLine admission (LE6)", () => {
       expect(next.resumed).toEqual([{ run_id: "workflow_runs_q1", device: "h1" }]);
     });
 
+    test("a held live flow still resumes a queued run, since a hold is for the flow's new runs; a flow switched off resumes nothing", async () => {
+      // Oct 29: a Prove hand held Union's flow for two days on a spent eval wallet, and the approved work queued to
+      // resume waited behind it along with every new problem.
+      const queuedRun = { _id: "workflow_runs_q1", user_id: HOST, status: "failed", org_role_id: ROLE, task_id: "tasks_q1", runner_device: "h1", project_path: "/home/ubuntu/h1/growth", current_node_id: "card_write", fail_reason: "card_write is waiting on a person", node_statuses: [], resume_queued: { at: "eval", by: HOST, since: NOW - 2_000 } };
+      const flow = (over: Record<string, any>) => ({ _id: "live_flows_1", workspace: `team:${TEAM}`, team_id: TEAM, workflow_id: "workflows_spine", on: true, changed_by: HOST, changed_at: 1, created_at: 1, ...over });
+      const setup = (over: Record<string, any>) =>
+        fixtures({
+          role: caps({ hands_per_day: 100 }),
+          extra: { initiatives, tasks: [...causes(2), cause({ _id: "tasks_q1", short_id: "ct-q1", status: "in_review" })], devices: [laptop, host("h1", 2)], workflow_runs: [{ ...queuedRun }], live_flows: [flow(over)] },
+        });
+      const held = setup({ hold: { why: "eval_proofs spent", until: NOW + 3_600_000, by: "jx7hand", at: NOW - 60_000 } });
+      const res = await sweepCore(held.ctx, NOW);
+      expect(res.resumed).toEqual([{ run_id: "workflow_runs_q1", device: "h1" }]);
+      expect(res.started).toEqual([]);
+      expect(held.tables.workflow_runs.find((r) => r._id === "workflow_runs_q1")).toMatchObject({ status: "running", current_node_id: "eval" });
+      const off = setup({ on: false });
+      expect((await sweepCore(off.ctx, NOW)).resumed ?? []).toEqual([]);
+      expect(off.tables.workflow_runs.find((r) => r._id === "workflow_runs_q1")!.status).toBe("failed");
+    });
+
     test("a failed run queued to resume goes back on its own host once that host has a slot, ahead of new starts", async () => {
       const queued = (id: string, device: string, since: number) => ({
         _id: `workflow_runs_${id}`, user_id: HOST, status: "failed", org_role_id: ROLE, task_id: `tasks_${id}`, runner_device: device,

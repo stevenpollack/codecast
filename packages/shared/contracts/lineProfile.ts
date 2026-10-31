@@ -44,7 +44,17 @@ export interface LineProfile {
   size_budget: number;
   watch_days: number;
   commands: { check: string; prove: string | null; eval: string | null; ship: string | null };
-  caps: { cards: number };
+  caps: {
+    cards: number;
+    /**
+     * The most of the team's running runs a station takes at once, by station
+     * id (`[line.caps.stations]`). A run past it waits outside the station
+     * with the station's clock not started: Eval proofs queued for one of the
+     * eval host's slots inside Eval's clock, and ct-68695 was killed an hour
+     * in with 91 of 95 cases drawn. Absent: no station is capped.
+     */
+    stations?: Record<string, number>;
+  };
   /**
    * Whether Ship merges on its own (`[line.merge]`). Absent on a profile
    * published by a CLI older than the key: read it as the default.

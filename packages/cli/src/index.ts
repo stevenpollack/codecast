@@ -21195,7 +21195,7 @@ workflow
         process.exit(1);
       }
     }
-    const { runWorkflow, stopRunOnSignals } = await import("./workflow/runner.js");
+    const { flowVersionsKey, runWorkflow, stopRunOnSignals } = await import("./workflow/runner.js");
     const runOpts = {
       runId,
       convexSiteUrl: siteUrl,
@@ -21207,6 +21207,17 @@ workflow
       spawnerSession: run.spawner_conversation_id || undefined,
       runSession: run.primary_conversation_id || undefined,
       ...(resume ? { resume: run } : {}),
+      // A run re-pinned onto newer flow versions starts its next station in a fresh runner on them (runner.ts pinnedElsewhere).
+      loadedFlowVersions: flowVersionsKey(run.flow_versions),
+      pinnedFlowVersions: async () => {
+        const r = await cliFetchRead(`${siteUrl}/cli/workflow-runs/get`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ api_token: config.auth_token, run_id: runId }),
+        });
+        const d = await r.json() as any;
+        return d?.run ? flowVersionsKey(d.run.flow_versions) : null;
+      },
       // A gate answered after the stations or this code changed continues in a fresh runner (runResume.ts).
       continueFresh: async () => {
         const { resolveCastInvocation } = await import("./castInvocation.js");

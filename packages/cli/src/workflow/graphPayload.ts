@@ -1,0 +1,41 @@
+// A graph's stations and routes as a workflows row stores them: the one
+// serializer every push site uses (the-line.md L8 node fidelity). Every node
+// attribute the daemon needs to run the stored graph as a local run would
+// (definition, reviewer, timeout, temperature, the gate's doc and category, a
+// station that parks) rides here, so no push site can drop one.
+import type { WorkflowGraph } from "./types.js";
+
+export function graphNodesPayload(graph: WorkflowGraph) {
+  return [...graph.nodes.values()].map((n) => ({
+    id: n.id, label: n.label, shape: n.shape, type: n.type,
+    ...(n.prompt ? { prompt: n.prompt } : {}),
+    ...(n.script ? { script: n.script } : {}),
+    ...(n.model ? { model: n.model } : {}),
+    ...(n.backend ? { backend: n.backend } : {}),
+    ...(n.agent ? { agent: n.agent } : {}),
+    ...(n.isolated !== undefined ? { isolated: n.isolated } : {}),
+    ...(n.parks ? { parks: true } : {}),
+    ...(n.reasoning_effort ? { reasoning_effort: n.reasoning_effort } : {}),
+    ...(n.max_visits !== undefined ? { max_visits: n.max_visits } : {}),
+    ...(n.max_retries !== undefined ? { max_retries: n.max_retries } : {}),
+    ...(n.retry_target ? { retry_target: n.retry_target } : {}),
+    ...(n.goal_gate !== undefined ? { goal_gate: n.goal_gate } : {}),
+    ...(n.definition ? { definition: n.definition } : {}),
+    ...(n.reviewer !== undefined ? { reviewer: n.reviewer } : {}),
+    ...(n.timeout !== undefined ? { timeout: n.timeout } : {}),
+    ...(n.temperature !== undefined ? { temperature: n.temperature } : {}),
+    ...(n.doc ? { doc: n.doc } : {}),
+    ...(n.category ? { category: n.category } : {}),
+    ...(n.card ? { card: n.card } : {}),
+    ...(n.asker ? { asker: n.asker } : {}),
+    ...(n.answerer ? { answerer: n.answerer } : {}),
+  }));
+}
+
+export function graphEdgesPayload(graph: WorkflowGraph) {
+  return graph.edges.map((e) => ({
+    from: e.from, to: e.to,
+    ...(e.label ? { label: e.label } : {}),
+    ...(e.condition ? { condition: e.condition } : {}),
+  }));
+}

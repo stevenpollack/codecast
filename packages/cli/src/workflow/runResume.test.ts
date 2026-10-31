@@ -171,6 +171,25 @@ describe("workflow/runResume (a run outlives its runner)", () => {
     expect(progress().some((c) => c.body.node_id === "decide" && c.body.node_status === "completed")).toBe(false);
   }, 30000);
 
+  // ct-61929 (Oct 30): a runner loaded before the Wallet station existed kept its graph through four re-pins,
+  // since a re-pin restarted only runners paused at a gate, and a wallet verdict went to a founder's card twice.
+  test("a run re-pinned onto a newer flow version starts its next station in a fresh runner", async () => {
+    let handedOff = false;
+    const continueFresh = () => { handedOff = true; return new Promise<void>(() => {}); };
+    const groundDone = () => progress().some((c) => c.body.node_id === "ground" && c.body.node_status === "completed");
+    void runWorkflow(graph(), options({ continueFresh, loadedFlowVersions: "v1", pinnedFlowVersions: async () => (groundDone() ? "v2" : "v1") }));
+    await until(() => handedOff);
+    expect(progress().some((c) => c.body.node_id === "build")).toBe(false);
+  }, 30000);
+
+  test("a run still on the versions it loaded goes on in the same runner", async () => {
+    gateAnswer = "S";
+    let handedOff = false;
+    const outcome = await runWorkflow(graph(), options({ continueFresh: async () => { handedOff = true; }, loadedFlowVersions: "v1", pinnedFlowVersions: async () => "v1" }));
+    expect(outcome).toBe("completed");
+    expect(handedOff).toBe(false);
+  }, 30000);
+
   test("a gate answered with nothing changed goes on in the same runner", async () => {
     gateAnswer = "S";
     let handedOff = false;

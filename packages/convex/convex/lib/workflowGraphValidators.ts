@@ -20,6 +20,9 @@ export const workflowNodeValidator = v.object({
   backend: v.optional(v.string()),
   agent: v.optional(v.string()),
   isolated: v.optional(v.boolean()),
+  // A station where a run waits on something outside it holds no machine slot
+  // while the run stands there (linePlacement.holdsSlot).
+  parks: v.optional(v.boolean()),
   // the-line.md L8: a run the daemon executes from this copy must match a
   // local run, so every attribute the runner reads is stored.
   definition: v.optional(v.string()),

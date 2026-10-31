@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { setThreadState, getThreadState } from "./conversations";
+import { enqueuePendingMessage } from "./pendingMessages";
 import { makeFakeDb } from "./testDb";
 
 // The pinned thread state (`cast state`). Two things must hold or the feature
@@ -221,6 +222,34 @@ describe("getThreadState", () => {
     await expect(
       (getThreadState as any)._handler(ctxAs(db, STRANGER), { session: "abc1234" }),
     ).rejects.toThrow("No session found");
+  });
+
+  test("a person's answer takes the pin down but leaves a station's report, dated, for its run", async () => {
+    // ct-74240 and ct-61100: a presenter pinned its report, the founder's
+    // answer landed before the run read it and took the pin down whole, and
+    // the run waited 90 minutes for a report the presenter knew it had given.
+    const tables = { ...tablesWith(), pending_messages: [] };
+    const db = makeFakeDb(tables);
+    const result = JSON.stringify({ recommend: "revise", settled: false });
+    await (setThreadState as any)._handler(ctxAs(db, RUNNER), { session: "abc1234", text: "Posted sd-2049.", status: "done", result });
+    const pinnedAt = (tables.conversations[0] as any).thread_state_at;
+    await enqueuePendingMessage({ db } as any, tables.conversations[0] as any, RUNNER, { content: "Decision: Ship it", human: true });
+
+    const read = await (getThreadState as any)._handler(ctxAs(db, RUNNER), { session: "abc1234" });
+    expect(read.state).toBeNull();
+    expect(read.status).toBeNull();
+    expect(read.result).toBe(result);
+    expect(read.at).toBe(pinnedAt);
+  });
+
+  test("clearing takes the report down with the pin", async () => {
+    const tables = tablesWith();
+    const db = makeFakeDb(tables);
+    await (setThreadState as any)._handler(ctxAs(db, RUNNER), { session: "abc1234", text: "Proven.", status: "done", result: "{\"outcome\":\"red\"}" });
+    await (setThreadState as any)._handler(ctxAs(db, RUNNER), { session: "abc1234", text: "" });
+    const read = await (getThreadState as any)._handler(ctxAs(db, RUNNER), { session: "abc1234" });
+    expect(read.result).toBeNull();
+    expect(read.at).toBeNull();
   });
 
   test("a probe asking if_exists gets null for a session it cannot see or that has not synced", async () => {
