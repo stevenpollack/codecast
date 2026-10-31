@@ -200,10 +200,12 @@ export function ScheduledTaskBlock({ content: rawContent, timestamp, hosted = fa
   const prevFailed = !!spawned?.previousRun && /^Failed/i.test(spawned.previousRun.summary);
 
   return (
-    <div className="mb-3 rounded border-l-2 border-sol-violet/60 bg-sol-violet/5">
+    // Orange is a trigger's colour wherever it appears (its pill, /triggers);
+    // the pill carries the bolt, so the frame draws one only when there is no pill.
+    <div className="mb-3 rounded border-l-2 border-sol-orange/60 bg-sol-orange/5">
       <div className="flex items-center gap-2 px-3 pt-2 pb-1">
-        <Zap className="w-3.5 h-3.5 text-sol-violet/70 shrink-0" />
-        <span className="text-[11px] font-medium tracking-wide uppercase text-sol-violet/70 shrink-0">{spawned ? "Trigger run" : "Trigger"}</span>
+        {!frame?.trigger && <Zap className="w-3.5 h-3.5 text-sol-orange/70 shrink-0" />}
+        <span className="text-[11px] font-medium tracking-wide uppercase text-sol-orange/70 shrink-0">{spawned ? "Trigger run" : "Trigger"}</span>
         {/* Apply is the norm and unmarked; read-only runs get the chip. */}
         {spawned && spawned.mode !== "apply" && (
           <ShortcutTooltip label="Read-only run — investigates and reports, changes nothing" hint="file-editing tools are disabled">
