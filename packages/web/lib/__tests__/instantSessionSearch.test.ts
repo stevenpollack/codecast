@@ -121,6 +121,14 @@ describe("rankSessions", () => {
   const rank = (rows: any[], q: string, standing: Record<string, Partial<SessionStanding>> = {}) =>
     rankSessions(rows, q, (r: any) => ({ ...quiet, ...standing[r._id] }), 25, NOW).map((r: any) => r._id);
 
+  test("an untitled session is named by what it began as, and its freshness counts (the ⌘K 'zen mode' case)", () => {
+    const rows = [
+      session({ _id: "old", title: "Zen mode UI polish", updated_at: NOW - 70 * 24 * H }),
+      session({ _id: "fresh", title: null, first_prompt: "[Image 1] the zen mode buttons are backwards", updated_at: NOW - H }),
+    ];
+    expect(rank(rows, "zen mode")).toEqual(["fresh", "old"]);
+  });
+
   test("a title hit beats a fresher hit in a summary (the ⌘K 'cloud' case)", () => {
     const rows = [
       session({ _id: "aurora", title: "Aurora toy hardware design", idle_summary: "ran the cloud render", updated_at: NOW }),

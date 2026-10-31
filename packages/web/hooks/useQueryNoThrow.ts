@@ -28,21 +28,38 @@ export const queryCircuitOpenError = new Error(
 // it (that's what actually stops the re-send loop) and return
 // queryCircuitOpenError. The breaker re-arms when the args change.
 //
+// remember (opt-in) keeps the newest answers in memory, keyed by query and
+// args, and hands one back while the same query is subscribing again: a search
+// typed a second time, or the palette reopened on it, paints at once and the
+// live answer replaces it when it lands. See rememberedResult.
+//
 // retry() re-subscribes the same query: it drops the subscription for one
 // render (so the client forgets the terminal result) and re-adds it, and it
 // re-arms the breaker. A surface that shows the error can offer it as its
 // "try again".
+const REMEMBER_MAX = 60;
+const remembered = new Map<string, unknown>();
+const argsKey = (args: Record<string, Value>) => JSON.stringify(convexToJson(args));
+
+/** The answer a `remember` subscription last got for these args, if any. */
+export function rememberedResult<Query extends FunctionReference<"query">>(
+  query: Query,
+  args: FunctionArgs<Query>,
+): FunctionReturnType<Query> | undefined {
+  return remembered.get(`${getFunctionName(query)}:${argsKey(args as Record<string, Value>)}`) as FunctionReturnType<Query> | undefined;
+}
+
 export function useQueryNoThrow<Query extends FunctionReference<"query">>(
   query: Query,
   args: FunctionArgs<Query> | "skip",
-  opts?: { breakAfterMs?: number },
+  opts?: { breakAfterMs?: number; remember?: boolean },
 ): { data: FunctionReturnType<Query> | undefined; error: Error | undefined; retry: () => void } {
   const skip = args === "skip";
   const queryName = getFunctionName(query);
   // Key the memo on serialized args, not object identity: useQueries treats a
   // fresh record object as a whole new query set and re-subscribes mid-render
   // (React "too many re-renders"). Mirrors convex's own useQuery internals.
-  const argsJson = JSON.stringify(skip ? {} : convexToJson(args as Record<string, Value>));
+  const argsJson = argsKey(skip ? {} : (args as Record<string, Value>));
   const key = `${queryName}:${argsJson}`;
   const [brokenKey, setBrokenKey] = useState<string | null>(null);
   const [pausedKey, setPausedKey] = useState<string | null>(null);
@@ -55,8 +72,15 @@ export function useQueryNoThrow<Query extends FunctionReference<"query">>(
     [argsJson, queryName, subscribed],
   );
   const results = useQueries(queries);
-  const value = subscribed ? results.value : undefined;
-  const loading = subscribed && value === undefined;
+  const live = subscribed ? results.value : undefined;
+  const loading = subscribed && live === undefined;
+  const remember = !!opts?.remember;
+  if (remember && live !== undefined && !(live instanceof Error)) {
+    remembered.delete(key);
+    remembered.set(key, live);
+    if (remembered.size > REMEMBER_MAX) remembered.delete(remembered.keys().next().value!);
+  }
+  const value = loading && remember ? remembered.get(key) : live;
 
   // The pause lasts one commit: useQueries (above) has already dropped the
   // subscription by the time this effect runs, so the next render re-adds it.

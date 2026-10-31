@@ -22,7 +22,7 @@ import { isHostedAgentType } from "@codecast/shared/contracts";
 import { promptTitle } from "@codecast/shared/contracts/assistant";
 import { ownTitle } from "./conversationTitle";
 import { cleanTitle } from "./conversationProcessor";
-import { sessionCardTitle } from "./sessionCard";
+import { sessionCardTitle, sessionTitleText } from "./sessionCard";
 import { matchScore, textWords } from "./mentionRanking";
 import { identityLine, identityRowOf, identitySig, type IdentityPrefs, type IdentityRow } from "./sessionIdentity";
 import { identityPrefsNow } from "../hooks/useIdentityPrefs";
@@ -62,6 +62,8 @@ type HaystackRow = Partial<IdentityRow> & {
   title?: string;
   agent_type?: string | null;
   last_user_message?: string | null;
+  /** What the session began as; the palette's session index carries it. */
+  first_prompt?: string | null;
   subtitle?: string;
   idle_summary?: string;
   thread_state?: string | null;
@@ -75,7 +77,7 @@ type HaystackRow = Partial<IdentityRow> & {
  *  "new". */
 function searchTitle(conv: HaystackRow): string {
   if (isHostedAgentType(conv.agent_type)) return ownTitle(conv) || promptTitle(conv.last_user_message);
-  return cleanTitle(conv.title || "");
+  return cleanTitle(sessionTitleText(conv));
 }
 
 // Per row object: a search re-reads the same rows on every keystroke, and a row
@@ -95,6 +97,7 @@ function buildHaystack(conv: HaystackRow, personify: IdentityPrefs): string {
     who?.name || "",
     who?.handle || "",
     searchTitle(conv),
+    conv.first_prompt || "",
     conv.subtitle || "",
     conv.idle_summary || "",
     conv.thread_state || "",

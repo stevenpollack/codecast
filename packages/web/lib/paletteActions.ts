@@ -230,10 +230,14 @@ const PALETTE_LABEL_EXACT = 1.6;
 // "New task"): below a label that starts with the query, above a keyword hit.
 const PALETTE_LABEL_WORDS = 1.25;
 const PALETTE_COMPOSE = 0.1;
-// A found row (a conversation, a to-do, a note, a routine) whose title holds
-// the query ranks above one found only in its words further in (a message
-// snippet), across kinds, and one whose title starts with it above both.
-// Both stay under a command the query names (PALETTE_LABEL_WORDS).
+// A to-do, note or routine whose title holds the query ranks above one found
+// only in its words further in, and one whose title starts with it above
+// both. Both stay under a command the query names (PALETTE_LABEL_WORDS).
+// Conversation rows (`__search__`, `__recent__`) arrive ranked already, by the
+// server's relevance and by rankSessions, which weigh the title along with
+// recency and standing; re-sorting them by title shape here sank a session
+// from an hour ago under every older one whose title merely began with the
+// query, so they score flat and keep their order.
 const PALETTE_TITLE_WORDS = 0.1;
 const PALETTE_TITLE_START = 0.15;
 // The rows after every hit, in this order: "N more in Everything", then
@@ -317,12 +321,10 @@ export function paletteItemScore(value: string, search: string): number {
   if (value.startsWith(PALETTE_TAIL_SEARCH)) return PALETTE_FULL_SEARCH;
   if (value.startsWith(PALETTE_KIND)) return PALETTE_MATCH + Math.max(PALETTE_TITLE_WORDS, titleHit(value, search));
   if (value.startsWith(PALETTE_ORG)) return PALETTE_MATCH + PALETTE_ORG_LIFT + titleHit(value, search);
+  if (value.startsWith("__entity__")) return PALETTE_MATCH + titleHit(value, search);
   if (
     value.startsWith("__search__") ||
     value.startsWith("__recent__") ||
-    value.startsWith("__entity__")
-  ) return PALETTE_MATCH + titleHit(value, search);
-  if (
     value.startsWith("__chat__") ||
     value.startsWith("__pick__") ||
     value.startsWith("__teammate__")

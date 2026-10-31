@@ -197,21 +197,29 @@ describe("command tree targeting", () => {
 });
 
 describe("palette item ranking", () => {
-  test("a title hit on any kind outranks a snippet hit, and the tail rows come last in order", () => {
+  test("a title hit on a to-do or note outranks a snippet hit, and the tail rows come last in order", () => {
     const q = "passport";
     const todo = paletteItemScore("__entity__ Renew passport before end of October |||t1", q);
     const note = paletteItemScore("__entity__ Passports |||d1", q);
-    const titled = paletteItemScore(paletteSearchValue({ conversationId: "c1", title: "Passport renewal", matches: [{ content: "my passport" }] }), q);
-    const snippet = paletteItemScore(paletteSearchValue({ conversationId: "c2", title: "Add dentist task", matches: [{ content: "renew the passport" }] }), q);
+    const snippet = paletteItemScore("__entity__ Travel checklist |||d2", q);
     const more = paletteItemScore(`${PALETTE_TAIL_MORE} more-in-everything`, q);
     const full = paletteItemScore(PALETTE_TAIL_SEARCH, q);
     const ask = paletteItemScore("__compose__ ask the codecast assistant hosted", q);
     expect(todo).toBeGreaterThan(snippet);
-    expect(titled).toBeGreaterThan(snippet);
     expect(note).toBeGreaterThan(todo);
     expect(snippet).toBeGreaterThan(more);
     expect(more).toBeGreaterThan(full);
     expect(full).toBeGreaterThan(ask);
+  });
+
+  test("conversation rows keep the order they were ranked in, whatever their titles start with", () => {
+    // The server ranked the session from an hour ago first; an older one whose
+    // title starts with the query must not jump it.
+    const q = "zen mode";
+    const fresh = paletteItemScore(paletteSearchValue({ conversationId: "c1", title: "[Image 1] the zen mode buttons are backwards", matches: [{ content: "zen mode" }] }), q);
+    const old = paletteItemScore(paletteSearchValue({ conversationId: "c2", title: "Zen mode UI polish", matches: [] }), q);
+    expect(fresh).toBe(old);
+    expect(paletteItemScore("__recent__ the zen mode toggle|||r1", q)).toBe(paletteItemScore("__recent__ Zen mode header|||r2", q));
   });
 
   test("a row that creates from the typed query loses to a real match", () => {

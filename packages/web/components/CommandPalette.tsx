@@ -1641,8 +1641,18 @@ function CommandPaletteImpl({ standalone = false }: { standalone?: boolean }) {
     // resurface rows from a previously viewed scope as recents.
     // Workers stay in: the ranking sinks them below the sessions they serve
     // rather than hiding a session someone may be reaching for by name.
-    for (const s of Object.values(filterInboxScopeFromState(useInboxStore.getState()))) {
+    const state = useInboxStore.getState();
+    for (const s of Object.values(filterInboxScopeFromState(state))) {
       byId.set(s._id, { ...byId.get(s._id), ...(s as any) });
+    }
+    // The session index (hooks/useSyncSessionIndex) holds every session the
+    // viewer owns, past the month the sessions cache keeps, so one from
+    // August answers here too. A row held above stays the live one and only
+    // learns what it began as; the index's own rows fill in the rest.
+    const meId = state.currentUser?._id;
+    for (const row of Object.values(state.sessionIndex as Record<string, any>)) {
+      const held = byId.get(row._id);
+      byId.set(row._id, held ? { ...held, first_prompt: held.first_prompt ?? row.first_prompt } : { ...row, user_id: meId });
     }
     setRecentSessions(Array.from(byId.values()).sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0)));
     // Server query has landed (undefined = still loading) → freeze.

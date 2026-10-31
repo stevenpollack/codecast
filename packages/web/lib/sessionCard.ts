@@ -10,9 +10,16 @@ import { formatDateSmart } from "@codecast/shared/time";
 /** The title a card shows, and the one its drags and drops are named by. A
  *  hosted conversation is called by the hosted rule (its ask until the
  *  assistant names it). */
-export function sessionCardTitle(session: { title?: string | null; agent_type?: string | null; last_user_message?: string | null }): string {
+export function sessionCardTitle(session: { title?: string | null; agent_type?: string | null; last_user_message?: string | null; first_prompt?: string | null }): string {
   if (isHostedAgentType(session.agent_type)) return conversationTitle(session);
-  return cleanTitle(session.title || "") || "New Session";
+  return cleanTitle(sessionTitleText(session));
+}
+
+/** The text a session is called by before cleaning: its title, else what it
+ *  began as when the row knows it (the palette's session index carries it;
+ *  the server's search names an untitled session the same way). */
+export function sessionTitleText(session: { title?: string | null; first_prompt?: string | null }): string {
+  return session.title || session.first_prompt || "";
 }
 
 // A row with no activity stamp yet (its fast fields ride the liveness overlay

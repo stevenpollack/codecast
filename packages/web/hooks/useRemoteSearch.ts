@@ -11,7 +11,7 @@
 import { useMemo, useState } from "react";
 import { api } from "@codecast/convex/convex/_generated/api";
 import { parseSessionQuery, sessionQuerySearches } from "@codecast/shared/search";
-import { useQueryNoThrow } from "./useQueryNoThrow";
+import { rememberedResult, useQueryNoThrow } from "./useQueryNoThrow";
 import { useWatchEffect } from "./useWatchEffect";
 import { mergeSearchRows } from "../lib/instantSessionSearch";
 
@@ -34,11 +34,19 @@ export function useRemoteSearch(query: string, opts: {
   debounceMs?: number;
 }) {
   const { enabled, chatTeamId, limit = 10, chatLimit = 5, userOnly, mineOnly, since, sort, activeTeamId, debounceMs = 250 } = opts;
+  const filters = { ...(mineOnly ? { mineOnly } : {}), ...(since ? { since } : {}), ...(activeTeamId ? { activeTeamId: activeTeamId as any } : {}) };
+  const contentArgs = (q: string) => ({ query: q, limit, ...filters, ...(userOnly ? { userOnly } : {}), ...(sort && sort !== "recent" ? { sort } : {}) });
+  const titleArgs = (q: string) => ({ query: q, limit, ...filters });
+
+  // A query answered before skips the pause: its remembered rows paint at
+  // once and the live subscription refreshes them.
   const [debouncedQuery, setDebouncedQuery] = useState("");
   useWatchEffect(() => {
     if (!enabled) { setDebouncedQuery(""); return; }
+    if (rememberedResult(api.conversations.searchConversations, contentArgs(query))) { setDebouncedQuery(query); return; }
     const timer = setTimeout(() => setDebouncedQuery(query), debounceMs);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, enabled, debounceMs]);
 
   // A lone operator being typed (`pr:`) searches nothing; its completions answer instead.
@@ -47,17 +55,17 @@ export function useRemoteSearch(query: string, opts: {
     [debouncedQuery],
   );
   const on = enabled && sessionSearchOn;
-  const filters = { ...(mineOnly ? { mineOnly } : {}), ...(since ? { since } : {}), ...(activeTeamId ? { activeTeamId: activeTeamId as any } : {}) };
   const { data: contentResults, error: searchError } = useQueryNoThrow(
     api.conversations.searchConversations,
-    on ? { query: debouncedQuery, limit, ...filters, ...(userOnly ? { userOnly } : {}), ...(sort && sort !== "recent" ? { sort } : {}) } : "skip",
-    { breakAfterMs: 15_000 },
+    on ? contentArgs(debouncedQuery) : "skip",
+    { breakAfterMs: 15_000, remember: true },
   );
   // Cheap always-fast companion: title/subtitle/summary matches land while (or
   // even if never) the message content search resolves.
   const { data: titleResults } = useQueryNoThrow(
     api.conversations.searchConversationTitles,
-    on && !userOnly ? { query: debouncedQuery, limit, ...filters } : "skip",
+    on && !userOnly ? titleArgs(debouncedQuery) : "skip",
+    { remember: true },
   );
   const contentData = contentResults && "results" in contentResults ? contentResults : null;
   const titleData = titleResults && "results" in titleResults ? titleResults : null;
@@ -73,7 +81,7 @@ export function useRemoteSearch(query: string, opts: {
   const { data: chatSearchData } = useQueryNoThrow(
     api.chat.searchMessages,
     enabled && chatTeamId && debouncedQuery.length >= 2 ? { team_id: chatTeamId as any, q: debouncedQuery, limit: chatLimit } : "skip",
-    { breakAfterMs: 15_000 },
+    { breakAfterMs: 15_000, remember: true },
   );
   const chatHits = (chatSearchData?.results ?? []) as any[];
 
