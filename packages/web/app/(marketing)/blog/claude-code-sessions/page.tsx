@@ -130,7 +130,7 @@ export default function ClaudeCodeSessionsPost() {
         <Screenshot
           src={`${DIR}/search.png`}
           alt="The search page with the query standard input, filters set to Only mine, My prompts and Past week. The first result is the session Word count: --top N flag in the wordcount project, 36 messages, with two of the prompts typed into it, the words standard and input highlighted"
-          caption="Search matches the words inside the conversation, not just the title."
+          caption="Search finds the words anywhere in the conversation, with each match highlighted."
         />
 
         <P>
