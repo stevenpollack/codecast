@@ -40,7 +40,7 @@ When a result keeps needing manual intervention or a workaround, change the syst
 
 Why: manual one-offs, silent spinners and fragile daemons push ongoing work and support back onto the owner.
 
-Evidence: 29 corrections across 23 sessions [PR-code-2]: codecast/738de269, codecast/6d66a45e, codecast/0f33215d, codecast/204dc98c, codecast/c8c6771d, codecast/616fbff1, codecast/jx7162g, codecast/jx79098, codecast/jx7e9av, codecast/b7e8002b, codecast/jx73zke, codecast/c3f8856c, codecast/91cd1654, union-mobile-outreach/281e2ac7, bookmark/67e9d943, aurora/fc51b6ab, codecast/e6d9c003, codecast/0c1345c3, codecast/c35bef55, codecast/6fee4a65, codecast/ad386d76, codecast/ca17cd9c, codecast/a52e0a86.
+Evidence: 33 corrections across 27 sessions [PR-code-2]: codecast/738de269, codecast/6d66a45e, codecast/0f33215d, codecast/204dc98c, codecast/c8c6771d, codecast/616fbff1, codecast/jx7162g, codecast/jx79098, codecast/jx7e9av, codecast/b7e8002b, codecast/jx73zke, codecast/c3f8856c, codecast/91cd1654, union-mobile-outreach/281e2ac7, bookmark/67e9d943, aurora/fc51b6ab, codecast/e6d9c003, codecast/0c1345c3, codecast/c35bef55, codecast/6fee4a65, codecast/ad386d76, codecast/ca17cd9c, codecast/a52e0a86, codecast/bb01e8f8, codecast/27e92264, codecast/d1c54572, codecast/8c983e64.
 
 ### CC-code-2 Cut load at its source
 
@@ -110,7 +110,7 @@ Interactions never leave the user guessing or surprise them. Every action gets i
 
 Why: hidden actions, jumping layouts, silent states and unexpected view switches made features feel broken even when they worked.
 
-Evidence: 40 corrections across 32 sessions: codecast/5cd65a63, codecast/8a5da82a, codecast/356f3371, codecast/2622f9a4, codecast/f388ef97, codecast/d78076a5, codecast/7603dece, codecast/bae26244, codecast/357dc99a, codecast/d0e1b2a5, codecast/d1b0172a, codecast/fcfb7767, codecast/6b76b81e, codecast/57e10167, codecast/3d3a114d, codecast/ba3755d7, codecast/23b202ab, codecast/26856fb1, codecast/377c6024, codecast/9924c5e6, codecast/03d88c38, codecast/2912b750, union-mobile/96cc4996, union-mobile-outreach/afd41522, codecast/904f00f7, codecast/81cae024, codecast/9e5d1eb5, codecast/665f4c2a, codecast/ca4d8feb, codecast/edddcb88, codecast/8d8ff33a, codecast/0cc88547.
+Evidence: 47 corrections across 37 sessions: codecast/5cd65a63, codecast/8a5da82a, codecast/356f3371, codecast/2622f9a4, codecast/f388ef97, codecast/d78076a5, codecast/7603dece, codecast/bae26244, codecast/357dc99a, codecast/d0e1b2a5, codecast/d1b0172a, codecast/fcfb7767, codecast/6b76b81e, codecast/57e10167, codecast/3d3a114d, codecast/ba3755d7, codecast/23b202ab, codecast/26856fb1, codecast/377c6024, codecast/9924c5e6, codecast/03d88c38, codecast/2912b750, union-mobile/96cc4996, union-mobile-outreach/afd41522, codecast/904f00f7, codecast/81cae024, codecast/9e5d1eb5, codecast/665f4c2a, codecast/ca4d8feb, codecast/edddcb88, codecast/8d8ff33a, codecast/0cc88547, codecast/422f463a, codecast/f241b445, codecast/ff004dc3, codecast/3353b41a, codecast/6b3bfe46.
 
 ### CC-design-2 One scroller, content first
 
@@ -138,6 +138,14 @@ Why: a feature that fails quietly or forgets the user's state looks broken, even
 
 Evidence: 8 corrections across 7 sessions: codecast/5cd65a63, codecast/c64919c4, codecast/106d22b7, codecast/f8e404e4, codecast/c8c6771d, codecast/36878dea, -Users-ashot/b22e7a56.
 
+### CC-product-2 A message reaches the people it is for, once, and gets noticed
+
+Every message and notification goes to exactly the audience it was addressed to, in the channel the sender chose: a message to one person stays one to one unless the sender chose a group. It arrives once, carries its real author, and reads well on the surface that shows it. It gets the recipient's attention where they are, including when its thread is closed or they are on a call, and clicking it opens the thread. A person can turn notifications off for any thread.
+
+Why: a message that lands in the wrong room, arrives twice, names the wrong author or arrives silently makes people miss what matters, and then stop trusting the channel at all.
+
+Evidence: 7 corrections across 6 sessions: codecast/2e154d8a, codecast/1a972efd, codecast/24470faa, codecast/f9fc999c, codecast/09594a71, codecast/63452593.
+
 ## Agents
 
 ### CC-agents-1 Inbox only for real asks
@@ -146,7 +154,7 @@ Keep the human's attention for what only they can do. Work an agent delegates or
 
 Why: every row in the needs-input queue costs attention, and inbox noise and needless wakes buried the few asks that mattered and wasted tokens.
 
-Evidence: 34 corrections across 27 sessions: codecast/75340f90, codecast/eb7cdbed, codecast/ac950a1e, codecast/2622f9a4, codecast/b8189b1a, codecast/fb8e21ef, codecast/jx7csbd, codecast/jx76e8h, codecast/jx7bs90, codecast/jx7as3d, codecast/700edf11, codecast/jx7er8q, codecast/7064c786, codecast/c397f70d, codecast/ab9f99a3, codecast/jx72nyf, codecast/jx7ey9r, union-mobile/bb47b784, -Users-ashot-src/c71b7cc8, -Users-ashot-src/421e971d, union-mobile-outreach-backend/d98a708c, codecast/10c015f6, codecast/378a9c20, codecast/88b135ad, codecast/32ae8b13, codecast/0f3d4676, codecast/7bf7bf94.
+Evidence: 35 corrections across 27 sessions: codecast/75340f90, codecast/eb7cdbed, codecast/ac950a1e, codecast/2622f9a4, codecast/b8189b1a, codecast/fb8e21ef, codecast/jx7csbd, codecast/jx76e8h, codecast/jx7bs90, codecast/jx7as3d, codecast/700edf11, codecast/jx7er8q, codecast/7064c786, codecast/c397f70d, codecast/ab9f99a3, codecast/jx72nyf, codecast/jx7ey9r, union-mobile/bb47b784, -Users-ashot-src/c71b7cc8, -Users-ashot-src/421e971d, union-mobile-outreach-backend/d98a708c, codecast/10c015f6, codecast/378a9c20, codecast/88b135ad, codecast/32ae8b13, codecast/0f3d4676, codecast/7bf7bf94.
 
 ### CC-agents-2 A decision card carries its own context
 
@@ -186,4 +194,12 @@ Roles, leads and agent sessions start work, spend and admit runs freely unless a
 
 Why: limits added by default stalled the work the owner had just asked for, and every one of them had to be found, explained and removed by hand before anything moved.
 
-Evidence: 3 corrections across 3 sessions [PR-product-2]: codecast/92d5aeac, codecast/fb8e21ef, codecast/378a9c20. Union holds the same rule for access as UN-process-4.
+Evidence: 4 corrections across 3 sessions [PR-product-2]: codecast/92d5aeac, codecast/fb8e21ef, codecast/378a9c20. Union holds the same rule for access as UN-process-4.
+
+### CC-agents-7 Agents speak up and show their work
+
+An agent with something a person in front of it needs says it without waiting to be asked: in a call, a thread or a lead's conversation, it offers what the code and the team's record show about what is being discussed, and when a page, chart or table would make the point faster than prose, it makes one and puts it inline. Holding back to save context or to avoid interrupting is the wrong default when someone is present and the content bears on their work. CC-agents-1 decides what enters a person's inbox; it is not a reason to stay quiet with someone already in the conversation.
+
+Why: agents that stayed silent or described instead of showing left the people they were meant to help without the answer that was one message away.
+
+Evidence: 2 corrections across 2 sessions: codecast/b986aae9, codecast/fb8e21ef. The same ask about huddle agents a week earlier is ct-70894.
