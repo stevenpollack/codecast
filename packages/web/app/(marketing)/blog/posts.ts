@@ -20,6 +20,16 @@ export type BlogPost = {
 
 export const POSTS: BlogPost[] = [
   {
+    slug: "claude-code-cursor-codex",
+    title: "Claude Code, Cursor and Codex on the same project",
+    dek: "Plenty of people run more than one coding agent on a project: Cursor for one piece, Claude Code for another, Codex for a second look. Codecast puts the sessions from each in one list, shows what each one said and did, and can move a conversation from Claude Code to Codex so the second agent picks up with the whole history.",
+    author: "the codecast team",
+    date: "2026-10-30",
+    dateLabel: "October 30, 2026",
+    readingMinutes: 5,
+    cover: { src: "/blog/claude-code-cursor-codex/switch-agent.png", alt: "The Switch agent list in codecast: Claude marked current, Codex, OpenCode, pi and Grok available, Cursor and Muse Spark marked can't rebuild history" },
+  },
+  {
     slug: "claude-code-sessions",
     title: "Finding, naming and reopening your Claude Code sessions",
     dek: "Claude Code keeps every session as a file on the machine that ran it, named by a random id. Codecast collects those sessions, and the ones from Codex, Cursor and Gemini, from every computer you use into one list. You can search what was said in them, give them names, read the whole transcript with the code it changed, and send the next message to any of them.",

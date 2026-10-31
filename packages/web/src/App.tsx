@@ -38,6 +38,7 @@ const BlogWorktrees = lazy(() => import("@/app/(marketing)/blog/one-repository-t
 const BlogTurns = lazy(() => import("@/app/(marketing)/blog/the-tree-at-the-end-of-every-turn/page"));
 const BlogUndo = lazy(() => import("@/app/(marketing)/blog/undo-with-a-history/page"));
 const BlogClaudeSessions = lazy(() => import("@/app/(marketing)/blog/claude-code-sessions/page"));
+const BlogAgentsTogether = lazy(() => import("@/app/(marketing)/blog/claude-code-cursor-codex/page"));
 const BlogChartReply = lazy(() => import("@/app/(marketing)/blog/the-chart-in-the-reply/page"));
 const BlogQuestions = lazy(() => import("@/app/(marketing)/blog/the-questions-your-agents-save-for-you/page"));
 const BlogTaskPage = lazy(() => import("@/app/(marketing)/blog/the-task-your-agent-reports-to/page"));
@@ -60,6 +61,7 @@ const JoinTeam = lazy(() => import("@/app/join/[code]/page"));
 const Inbox = lazy(() => import("@/app/inbox/page"));
 const Feed = lazy(() => import("@/app/feed/page"));
 const Changes = lazy(() => import("@/app/changes/page"));
+const Prompts = lazy(() => import("@/app/prompts/page"));
 const Mods = lazy(() => import("@/app/mods/page"));
 const ModPane = lazy(() => import("@/app/m/page"));
 const ModObjects = lazy(() => import("@/app/objects/page"));
@@ -243,6 +245,7 @@ export function App() {
               <Route path="blog/the-tree-at-the-end-of-every-turn" element={<E name="BlogTurns"><BlogTurns /></E>} />
               <Route path="blog/undo-with-a-history" element={<E name="BlogUndo"><BlogUndo /></E>} />
               <Route path="blog/claude-code-sessions" element={<E name="BlogClaudeSessions"><BlogClaudeSessions /></E>} />
+              <Route path="blog/claude-code-cursor-codex" element={<E name="BlogAgentsTogether"><BlogAgentsTogether /></E>} />
               <Route path="blog/the-chart-in-the-reply" element={<E name="BlogChartReply"><BlogChartReply /></E>} />
               <Route path="blog/the-questions-your-agents-save-for-you" element={<E name="BlogQuestions"><BlogQuestions /></E>} />
               <Route path="blog/the-task-your-agent-reports-to" element={<E name="BlogTaskPage"><BlogTaskPage /></E>} />
@@ -277,6 +280,7 @@ export function App() {
               <Route path="inbox" element={<E name="Inbox"><Inbox /></E>} />
               <Route path="feed" element={<E name="Feed"><Feed /></E>} />
               <Route path="changes" element={<E name="Changes"><Changes /></E>} />
+              <Route path="prompts" element={<E name="Prompts"><Prompts /></E>} />
               <Route path="mods" element={<E name="Mods"><Mods /></E>} />
               <Route path="m/:mod" element={<E name="ModPane"><ModPane /></E>} />
               <Route path="m/:mod/:pane" element={<E name="ModPane"><ModPane /></E>} />

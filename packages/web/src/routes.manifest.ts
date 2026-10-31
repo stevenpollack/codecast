@@ -113,6 +113,7 @@ const BlogWorktrees = lazy(() => import("@/app/(marketing)/blog/one-repository-t
 const BlogTurns = lazy(() => import("@/app/(marketing)/blog/the-tree-at-the-end-of-every-turn/page"));
 const BlogUndo = lazy(() => import("@/app/(marketing)/blog/undo-with-a-history/page"));
 const BlogClaudeSessions = lazy(() => import("@/app/(marketing)/blog/claude-code-sessions/page"));
+const BlogAgentsTogether = lazy(() => import("@/app/(marketing)/blog/claude-code-cursor-codex/page"));
 const BlogChartReply = lazy(() => import("@/app/(marketing)/blog/the-chart-in-the-reply/page"));
 const BlogQuestions = lazy(() => import("@/app/(marketing)/blog/the-questions-your-agents-save-for-you/page"));
 const BlogTaskPage = lazy(() => import("@/app/(marketing)/blog/the-task-your-agent-reports-to/page"));
@@ -141,6 +142,7 @@ const JoinTeam = lazy(() => import("@/app/join/[code]/page"));
 const Inbox = lazy(() => import("@/app/inbox/page"));
 const Feed = lazy(() => import("@/app/feed/page"));
 const Changes = lazy(() => import("@/app/changes/page"));
+const Prompts = lazy(() => import("@/app/prompts/page"));
 const Mods = lazy(() => import("@/app/mods/page"));
 const ModPane = lazy(() => import("@/app/m/page"));
 const ModObjects = lazy(() => import("@/app/objects/page"));
@@ -320,6 +322,7 @@ export const ROUTES: RouteEntry[] = [
   { path: "blog/the-tree-at-the-end-of-every-turn", component: cast(BlogTurns), layout: "marketing", guestOk: true, guestKind: "public" },
   { path: "blog/undo-with-a-history", component: cast(BlogUndo), layout: "marketing", guestOk: true, guestKind: "public" },
   { path: "blog/claude-code-sessions", component: cast(BlogClaudeSessions), layout: "marketing", guestOk: true, guestKind: "public" },
+  { path: "blog/claude-code-cursor-codex", component: cast(BlogAgentsTogether), layout: "marketing", guestOk: true, guestKind: "public" },
   { path: "blog/the-chart-in-the-reply", component: cast(BlogChartReply), layout: "marketing", guestOk: true, guestKind: "public" },
   { path: "blog/the-questions-your-agents-save-for-you", component: cast(BlogQuestions), layout: "marketing", guestOk: true, guestKind: "public" },
   { path: "blog/the-task-your-agent-reports-to", component: cast(BlogTaskPage), layout: "marketing", guestOk: true, guestKind: "public" },
@@ -347,6 +350,8 @@ export const ROUTES: RouteEntry[] = [
   { path: "feed", component: cast(Feed), layout: "dashboardShell", tab: "/feed" },
   // The daily edition owns its 1180px reading column (changes-page.md 4).
   { path: "changes", component: cast(Changes), layout: "dashboardShell", tab: "/changes", fullWidth: true },
+  // One day of what each person typed into sessions, a column each.
+  { path: "prompts", component: cast(Prompts), layout: "dashboardShell", tab: "/prompts", fullWidth: true },
   // Codecast mods: the list, and one mod's pane (components/mods).
   { path: "mods", component: cast(Mods), layout: "dashboardShell", tab: "/mods" },
   { path: "m/:mod", component: cast(ModPane), layout: "dashboardShell", tab: "/m/:mod", fullWidth: true },
