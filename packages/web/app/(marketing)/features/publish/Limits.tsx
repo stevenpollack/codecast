@@ -8,7 +8,7 @@ import { FEATURE_DEEP_DIVES, featureHref } from "../catalog";
 import { C, CYAN, Section } from "./kit";
 
 const LIMITS: { q: string; a: ReactNode }[] = [
-  { q: "How big can a page be?", a: <>8 MB for a file or a folder&apos;s files together. Video and audio don&apos;t count; each can be up to 2 GB. Over the cap, the CLI names the five biggest files so you know what to trim.</> },
+  { q: "How big can a page be?", a: <>8 MB for a single html file, and 24 MB for a folder&apos;s files together. Video and audio don&apos;t count; each can be up to 2 GB. Over the cap, the CLI names the five biggest files so you know what to trim.</> },
   { q: "What can I publish?", a: <>An <C>.html</C> file, a <C>.md</C> file, or a folder with an <C>index.html</C> (or exactly one <C>.html</C> file). Other single files are refused. Images go through <C>cast image</C>, which takes raster formats only: SVG is excluded because it can carry script.</> },
   { q: "Is an unlisted link private?", a: <>No. Anyone holding the link can open it unless you add a gate. Links are long and random and never indexed, so nobody finds one by searching. For anything sensitive, add a password or an expiry.</> },
   { q: "Can I take a page back after sharing it?", a: <>You can close the link (Delete in Pages, an expiry, a new password) and caches stop serving it within six minutes. You can&apos;t recall a copy a reader already saved.</> },

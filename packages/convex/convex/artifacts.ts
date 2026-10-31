@@ -37,7 +37,12 @@ import { eTokenFor, gateFailure, isExpired, kTokenFor } from "./lib/artifactGate
 import { decisionPageSlugs, findDecision, userMayRead } from "./lib/decisionAccess";
 import { bumpWindow } from "./ipRateLimit";
 
-export const MAX_ARTIFACT_BYTES = 8 * 1024 * 1024;
+/** A page's files together. */
+export const MAX_ARTIFACT_BYTES = 24 * 1024 * 1024;
+export const MAX_ARTIFACT_MB = MAX_ARTIFACT_BYTES / 1024 / 1024;
+/** The html document itself: serving reads it whole into a 64 MB heap to inject the page's scripts. */
+export const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
+export const MAX_DOCUMENT_MB = MAX_DOCUMENT_BYTES / 1024 / 1024;
 
 // Superseded versions kept per artifact (beyond the current one). Old blobs
 // are snapshotted into artifact_versions on republish; past this cap the
@@ -206,6 +211,61 @@ export const verify = internalQuery({
   handler: async (ctx, args) => {
     const result = await verifyApiToken(ctx, args.api_token);
     return result ? { user_id: result.userId } : null;
+  },
+});
+
+// --- Pre-uploaded bundle files (POST /cli/artifacts/upload) ---
+
+/** Uploads older than this were never attached by a publish; the sweep deletes them. */
+const UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
+
+export const recordUpload = internalMutation({
+  args: { user_id: v.id("users"), storage_id: v.id("_storage") },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("artifact_uploads", { ...args, created_at: Date.now() });
+  },
+});
+
+/** Size and sha-256 (hex) of each upload, or null when any id is not this user's unclaimed upload. */
+export const uploadsOwned = internalQuery({
+  args: { user_id: v.id("users"), storage_ids: v.array(v.id("_storage")) },
+  handler: async (ctx, args) => {
+    const out: Array<{ storage_id: Id<"_storage">; size: number; sha256: string }> = [];
+    for (const id of args.storage_ids) {
+      const row = await ctx.db.query("artifact_uploads").withIndex("by_storage_id", (q) => q.eq("storage_id", id)).first();
+      const meta = row?.user_id === args.user_id ? await ctx.db.system.get(id) : null;
+      if (!meta) return null;
+      const hex = Array.from(atob(meta.sha256), (c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+      out.push({ storage_id: id, size: meta.size, sha256: hex });
+    }
+    return out;
+  },
+});
+
+/** Settle uploads after a publish: attached ones lose their row (the asset owns the blob now), the rest are deleted. */
+export const settleUploads = internalMutation({
+  args: { storage_ids: v.array(v.id("_storage")), attached: v.boolean() },
+  handler: async (ctx, args) => {
+    for (const id of args.storage_ids) {
+      const row = await ctx.db.query("artifact_uploads").withIndex("by_storage_id", (q) => q.eq("storage_id", id)).first();
+      if (!row) continue;
+      await ctx.db.delete(row._id);
+      if (!args.attached) await ctx.storage.delete(id).catch(() => {});
+    }
+  },
+});
+
+export const sweepUploads = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const stale = await ctx.db
+      .query("artifact_uploads")
+      .withIndex("by_created_at", (q) => q.lt("created_at", Date.now() - UPLOAD_TTL_MS))
+      .take(200);
+    for (const row of stale) {
+      await ctx.db.delete(row._id);
+      await ctx.storage.delete(row.storage_id).catch(() => {});
+    }
   },
 });
 

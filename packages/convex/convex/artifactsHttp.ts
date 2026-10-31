@@ -9,6 +9,9 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   MAX_ARTIFACT_BYTES,
+  MAX_ARTIFACT_MB,
+  MAX_DOCUMENT_BYTES,
+  MAX_DOCUMENT_MB,
   newSlug,
   newSecret,
   artifactUrl,
@@ -349,7 +352,38 @@ function injectPlayer(html: string, apiBase: string): string {
   return head ? html.replace(/<\/head>/i, `${tag}</head>`) : tag + html;
 }
 
+/** Largest asset served through the action; past it, a redirect to storage. */
+const STREAM_MAX_BYTES = 16 * 1024 * 1024;
+
+/** One bundle file as the raw request body, stored as-is: a big file never
+ * crosses the publish action as base64. Answers the upload_id a publish names. */
+export const upload = httpAction(async (ctx, request) => {
+  try {
+    const api_token = (request.headers.get("authorization") ?? "").replace(/^Bearer /, "");
+    if (!api_token) return json({ error: "Missing api_token" }, 400);
+    const who = await ctx.runQuery(internal.artifacts.verify, { api_token });
+    if (!who) return json({ error: "Unauthorized" }, 401);
+    const refusal = await ctx.runQuery(internal.managedDevices.publishRefusal, { api_token });
+    if (refusal) return json({ error: refusal }, 403);
+    const tooBig = (bytes: number) => json({ error: `File is ${(bytes / 1024 / 1024).toFixed(1)}MB — the limit is ${MAX_ARTIFACT_MB}MB.` }, 413);
+    const declared = Number(request.headers.get("content-length") ?? 0);
+    if (declared > MAX_ARTIFACT_BYTES) return tooBig(declared);
+    const body = await request.blob();
+    if (body.size > MAX_ARTIFACT_BYTES) return tooBig(body.size);
+    // Stored with the type the page serves it as: a big file is read from storage directly.
+    const path = new URL(request.url).searchParams.get("path");
+    const storage_id = await ctx.storage.store(path ? new Blob([body], { type: contentTypeFor(path) }) : body);
+    await ctx.runMutation(internal.artifacts.recordUpload, { user_id: who.user_id, storage_id });
+    return json({ upload_id: storage_id });
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : "Internal error" }, 500);
+  }
+});
+
 export const publish = httpAction(async (ctx, request) => {
+  // Uploads this publish claimed: attached to the new version on success, deleted otherwise.
+  let claimed: Id<"_storage">[] = [];
+  let attached = false;
   try {
     const body = await request.json();
     const { api_token, content, title, source_path, force_new, kind: rawKind, files, session_ref, access, thumb_b64, task, plan, data } = body;
@@ -381,7 +415,7 @@ export const publish = httpAction(async (ctx, request) => {
     let docHtml: string;
     let contentHash: string;
     let sourceText: string | undefined;
-    let assetInputs: Array<{ path: string; bytes: Uint8Array; content_type: string }> = [];
+    let assetInputs: Array<{ path: string; bytes?: Uint8Array; upload?: { storage_id: Id<"_storage">; size: number; sha256: string }; content_type: string }> = [];
 
     if (kind === "markdown") {
       sourceText = content as string;
@@ -393,6 +427,7 @@ export const publish = httpAction(async (ctx, request) => {
       let entryPath: string | null = null;
       const htmlCandidates: string[] = [];
       let total = 0;
+      const uploadRefs: Array<{ path: string; storage_id: Id<"_storage"> }> = [];
       for (const f of files) {
         const path = typeof f?.path === "string" ? normalizeAssetPath(f.path) : null;
         if (!path) return json({ error: `Invalid bundle path: ${JSON.stringify(f?.path ?? null)}` }, 400);
@@ -404,14 +439,30 @@ export const publish = httpAction(async (ctx, request) => {
           assetInputs.push({ path, bytes: new TextEncoder().encode(pointer), content_type: MEDIA_POINTER_TYPE });
           continue;
         }
+        if (/\.html?$/i.test(path)) htmlCandidates.push(path);
+        if (typeof f.upload_id === "string") {
+          uploadRefs.push({ path, storage_id: f.upload_id as Id<"_storage"> });
+          continue;
+        }
         if (typeof f.content_b64 !== "string") return json({ error: `Missing content for ${path}` }, 400);
         const bytes = b64ToBytes(f.content_b64);
         total += bytes.byteLength;
-        if (/\.html?$/i.test(path)) htmlCandidates.push(path);
         assetInputs.push({ path, bytes, content_type: contentTypeFor(path) });
       }
+      if (uploadRefs.length) {
+        const owned = await ctx.runQuery(internal.artifacts.uploadsOwned, {
+          user_id: who.user_id,
+          storage_ids: uploadRefs.map((u) => u.storage_id),
+        });
+        if (!owned) return json({ error: "Unknown upload: upload the bundle's files again" }, 400);
+        claimed = owned.map((o) => o.storage_id);
+        owned.forEach((o, i) => {
+          total += o.size;
+          assetInputs.push({ path: uploadRefs[i].path, upload: o, content_type: contentTypeFor(uploadRefs[i].path) });
+        });
+      }
       if (total > MAX_ARTIFACT_BYTES) {
-        return json({ error: `Bundle is ${(total / 1024 / 1024).toFixed(1)}MB — the limit is 8MB total.` }, 413);
+        return json({ error: `Bundle is ${(total / 1024 / 1024).toFixed(1)}MB — the limit is ${MAX_ARTIFACT_MB}MB total.` }, 413);
       }
       entryPath = htmlCandidates.includes("index.html")
         ? "index.html"
@@ -422,13 +473,14 @@ export const publish = httpAction(async (ctx, request) => {
         return json({ error: "Bundle needs an index.html (or exactly one .html file) as the entry page" }, 400);
       }
       const entry = assetInputs.find((a) => a.path === entryPath)!;
+      if (!entry.bytes) return json({ error: `The entry page ${entryPath} must be sent inline, not uploaded` }, 400);
       entryHtml = new TextDecoder().decode(entry.bytes);
       assetInputs = assetInputs.filter((a) => a.path !== entryPath);
       // Hash over the canonical file list so any file change bumps a version.
       const parts: string[] = [];
       parts.push(`${entryPath}:${await sha256Hex(entryHtml)}`);
       for (const a of assetInputs.slice().sort((x, y) => (x.path < y.path ? -1 : 1))) {
-        const hex = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", a.bytes as unknown as ArrayBuffer)), (b) =>
+        const hex = a.upload ? a.upload.sha256 : Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", a.bytes! as unknown as ArrayBuffer)), (b) =>
           b.toString(16).padStart(2, "0"),
         ).join("");
         parts.push(`${a.path}:${hex}`);
@@ -441,8 +493,8 @@ export const publish = httpAction(async (ctx, request) => {
     }
 
     const size = new TextEncoder().encode(docHtml).byteLength;
-    if (size > MAX_ARTIFACT_BYTES) {
-      return json({ error: `Artifact is ${(size / 1024 / 1024).toFixed(1)}MB — the limit is 8MB. Inline fewer assets or split the page.` }, 413);
+    if (size > MAX_DOCUMENT_BYTES) {
+      return json({ error: `The page is ${(size / 1024 / 1024).toFixed(1)}MB — the limit is ${MAX_DOCUMENT_MB}MB for the html itself. Move inlined images and data into files beside it and publish the folder (up to ${MAX_ARTIFACT_MB}MB).` }, 413);
     }
 
     // Access flags → hashed set (needs slug).
@@ -522,8 +574,12 @@ export const publish = httpAction(async (ctx, request) => {
         : undefined;
     const assets = [];
     for (const a of assetInputs) {
+      if (a.upload) {
+        assets.push({ path: a.path, storage_id: a.upload.storage_id, content_type: a.content_type, size: a.upload.size });
+        continue;
+      }
       const id = await ctx.storage.store(new Blob([a.bytes as unknown as ArrayBuffer], { type: a.content_type }));
-      assets.push({ path: a.path, storage_id: id, content_type: a.content_type, size: a.bytes.byteLength });
+      assets.push({ path: a.path, storage_id: id, content_type: a.content_type, size: a.bytes!.byteLength });
     }
     let thumbStorageId;
     if (typeof thumb_b64 === "string" && thumb_b64 && thumb_b64.length < 3 * 1024 * 1024) {
@@ -556,6 +612,7 @@ export const publish = httpAction(async (ctx, request) => {
       plan_id: binding.plan_id,
       station: binding.station,
     });
+    attached = true;
     // A republish replaces the page's query set; a page without one has none.
     await ctx.runMutation(internal.pageData.replaceQueries, {
       slug: result.slug,
@@ -573,6 +630,8 @@ export const publish = httpAction(async (ctx, request) => {
     });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Internal error" }, 500);
+  } finally {
+    if (claimed.length) await ctx.runMutation(internal.artifacts.settleUploads, { storage_ids: claimed, attached });
   }
 });
 
@@ -773,7 +832,7 @@ export async function applyEditVersion(
     contentHash = await sha256Hex(docHtml);
   }
   const size = new TextEncoder().encode(docHtml).byteLength;
-  if (size > MAX_ARTIFACT_BYTES) return { error: "Content exceeds the 8MB limit" };
+  if (size > MAX_DOCUMENT_BYTES) return { error: `Content exceeds the ${MAX_DOCUMENT_MB}MB limit` };
   if (artifact.content_hash === contentHash && kind !== "bundle") {
     if (sourceStorageId) await ctx.storage.delete(sourceStorageId).catch(() => {});
     return { version: artifact.version, unchanged: true };
@@ -1125,6 +1184,14 @@ export const serve = httpAction(async (ctx, request) => {
     }
     const asset = await ctx.runQuery(internal.artifacts.assetByPath, { artifact_id: artifact._id, version, path });
     if (!asset) return notFound("Not found");
+    // An HTTP action's response stops at about 20 MB, so a bigger file is read
+    // from storage directly. Never a document type: storage answers on the
+    // backend's own origin, without the page sandbox.
+    if (asset.size > STREAM_MAX_BYTES && !/html|svg|xml/i.test(asset.content_type)) {
+      const direct = await ctx.storage.getUrl(asset.storage_id);
+      if (!direct) return notFound("Not found");
+      return new Response(null, { status: 302, headers: { Location: direct, "Cache-Control": cachePolicy(artifact), "Access-Control-Allow-Origin": "*" } });
+    }
     const blob = await ctx.storage.get(asset.storage_id);
     if (!blob) return notFound("Not found");
     if (asset.content_type === MEDIA_POINTER_TYPE) {

@@ -5,7 +5,7 @@
 import * as path from "path";
 
 /** Server-enforced too — keep in sync with /cli/artifacts/publish in convex/http.ts. */
-export const PUBLISH_MAX_BYTES = 8 * 1024 * 1024;
+export const PUBLISH_MAX_BYTES = 24 * 1024 * 1024;
 
 const ENTITIES: Record<string, string> = {
   "&amp;": "&",

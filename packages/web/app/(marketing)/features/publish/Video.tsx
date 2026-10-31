@@ -103,7 +103,7 @@ export function Video() {
         <div className="min-w-0">
           <div className="space-y-4">
             <Note>
-              Files up to 2 GB each, in <C>.mp4</C>, <C>.webm</C>, <C>.mov</C>, <C>.m4v</C>, <C>.mp3</C>, <C>.m4a</C>, <C>.ogg</C> and <C>.wav</C>. They don&apos;t count toward the page&apos;s 8 MB, and a <C>--watch</C> loop doesn&apos;t upload an unchanged file twice.
+              Files up to 2 GB each, in <C>.mp4</C>, <C>.webm</C>, <C>.mov</C>, <C>.m4v</C>, <C>.mp3</C>, <C>.m4a</C>, <C>.ogg</C> and <C>.wav</C>. They don&apos;t count toward the page&apos;s 24 MB, and a <C>--watch</C> loop doesn&apos;t upload an unchanged file twice.
             </Note>
             <Note>
               Style the player from the page&apos;s CSS with <C>--cast-accent</C>, <C>--cast-font</C>, <C>--cast-aspect</C> and friends. Script it with <C>play()</C>, <C>seek()</C> and <C>goTo()</C>. Add <C>data-native</C> to keep the browser&apos;s own player; autoplay and looping clips stay native on their own.

@@ -38,7 +38,7 @@ import {
   type AccessFlagValues,
   type ArtifactLsRow,
 } from "./publishCommand.js";
-import { apiPost, missingRouteError, type PublishDeps } from "./castApi.js";
+import { apiPost, apiUpload, missingRouteError, type PublishDeps } from "./castApi.js";
 import { CAST_PLAYER_GUIDE, describePageAnchor, pageEmbedUrl, pageIsMotion, pageUsesPlayer, parsePageAnchor } from "@codecast/shared/contracts";
 import { commandGroup } from "./commandGroups.js";
 import { readPageData, runPublishData } from "./publishData.js";
@@ -137,7 +137,7 @@ interface PublishPayload {
   source_path: string;
   kind?: "markdown" | "bundle";
   content?: string;
-  files?: Array<{ path: string; content_b64?: string; media_url?: string; size?: number }>;
+  files?: Array<{ path: string; content_b64?: string; upload_id?: string; media_url?: string; size?: number }>;
   /** Video and audio files, uploaded to media hosting before the publish. */
   media?: Array<{ path: string; abs: string; size: number }>;
   /** Local path of the html document a thumbnail should render. */
@@ -626,6 +626,39 @@ export async function uploadMedia(deps: PublishDeps, payload: PublishPayload): P
   }
 }
 
+/** File bytes the publish body carries inline. The server decodes them inside a
+ * 64 MB heap, so past this the biggest files go up first as raw uploads. */
+export const INLINE_BUDGET_BYTES = 4 * 1024 * 1024;
+
+/** Paths to upload ahead of the publish, biggest first, until the inline rest fits the budget. The entry page always stays inline. */
+export function pathsToUpload(files: Array<{ path: string; size: number }>, entryPath: string | null, budget = INLINE_BUDGET_BYTES): string[] {
+  let inline = files.reduce((sum, f) => sum + f.size, 0);
+  const out: string[] = [];
+  for (const f of [...files].sort((a, b) => b.size - a.size)) {
+    if (inline <= budget) break;
+    if (f.path === entryPath) continue;
+    out.push(f.path);
+    inline -= f.size;
+  }
+  return out;
+}
+
+export async function uploadLargeFiles(deps: PublishDeps, payload: PublishPayload): Promise<void> {
+  if (payload.kind !== "bundle" || !payload.files) return;
+  const inline = payload.files.filter((f) => f.content_b64 !== undefined);
+  const bytes = new Map(inline.map((f) => [f.path, Buffer.from(f.content_b64!, "base64")]));
+  const entry = payload.entryHtmlPath ? path.relative(payload.source_path, payload.entryHtmlPath).split(path.sep).join("/") : null;
+  const chosen = new Set(pathsToUpload(inline.map((f) => ({ path: f.path, size: bytes.get(f.path)!.byteLength })), entry));
+  for (const f of payload.files) {
+    if (!chosen.has(f.path)) continue;
+    const b = bytes.get(f.path)!;
+    process.stderr.write(fmt.muted(`uploading ${f.path} (${formatBytes(b.byteLength)})\n`));
+    const { upload_id } = await apiUpload(deps, `/cli/artifacts/upload?path=${encodeURIComponent(f.path)}`, new Blob([b]), { exitOnError: false });
+    delete f.content_b64;
+    f.upload_id = upload_id;
+  }
+}
+
 export async function publishOnce(
   deps: PublishDeps,
   absPath: string,
@@ -634,6 +667,7 @@ export async function publishOnce(
 ): Promise<{ result: any; title: string; showsVideo: boolean; skipped: NonNullable<PublishPayload["skipped"]> }> {
   const payload = buildPublishPayload(absPath, options.title);
   await uploadMedia(deps, payload);
+  await uploadLargeFiles(deps, payload);
   let thumbB64: string | undefined;
   if (extra.withThumb && options.thumb !== false && payload.entryHtmlPath) {
     thumbB64 = (payload.motion ? await captureMotionThumb(payload.entryHtmlPath) : await captureThumb(payload.entryHtmlPath)) ?? undefined;

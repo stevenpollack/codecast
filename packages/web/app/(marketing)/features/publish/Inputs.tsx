@@ -98,7 +98,7 @@ const ROWS: Row[] = [
     rules: [
       <><C>index.html</C> is the entry, or the folder&apos;s only <C>.html</C> file. Relative paths keep working.</>,
       <>Dotfiles, <C>node_modules</C> and sourcemaps stay behind.</>,
-      <>Up to 8 MB of files. Video and audio upload to media hosting instead, up to 2 GB each, and don&apos;t count toward that.</>,
+      <>Up to 24 MB of files. Video and audio upload to media hosting instead, up to 2 GB each, and don&apos;t count toward that.</>,
     ],
   },
 ];

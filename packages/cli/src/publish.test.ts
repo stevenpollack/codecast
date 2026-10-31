@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { buildPublishPayload, describeEvidence, findChrome, publishRequestBody, thumbArgs, walkBundleDir } from "./publish";
+import { buildPublishPayload, describeEvidence, findChrome, pathsToUpload, publishRequestBody, thumbArgs, walkBundleDir } from "./publish";
 
 let dir: string;
 
@@ -74,7 +74,7 @@ describe("buildPublishPayload", () => {
 
   it("directory over the size cap throws naming the biggest files", () => {
     write("index.html", "<title>Big</title>");
-    write("huge.bin", Buffer.alloc(9 * 1024 * 1024));
+    write("huge.bin", Buffer.alloc(25 * 1024 * 1024));
     expect(() => buildPublishPayload(dir)).toThrow(/huge\.bin/);
   });
 
@@ -190,5 +190,22 @@ describe("describeEvidence", () => {
     expect(describeEvidence({ task: null, plan: "pl-3", station: null })).toBe("attached to pl-3");
     expect(describeEvidence({ task: null, plan: null })).toBeNull();
     expect(describeEvidence(undefined)).toBeNull();
+  });
+});
+
+describe("pathsToUpload", () => {
+  const MB = 1024 * 1024;
+  it("uploads nothing when the bundle fits inline", () => {
+    expect(pathsToUpload([{ path: "index.html", size: MB }, { path: "a.png", size: 2 * MB }], "index.html")).toEqual([]);
+  });
+
+  it("uploads the biggest files until the rest fits, never the entry", () => {
+    const files = [
+      { path: "index.html", size: 6 * MB },
+      { path: "small.js", size: MB },
+      { path: "big.bin", size: 10 * MB },
+      { path: "mid.json", size: 3 * MB },
+    ];
+    expect(pathsToUpload(files, "index.html", 8 * MB)).toEqual(["big.bin", "mid.json"]);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { applyEditVersion, cachePolicy, REVOCATION_BOUND_MS } from "./artifactsHttp";
-import { MAX_ARTIFACT_BYTES } from "./artifacts";
+import { MAX_DOCUMENT_BYTES } from "./artifacts";
 
 async function sha256Hex(s: string): Promise<string> {
   const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
@@ -147,7 +147,7 @@ describe("applyEditVersion", () => {
 
   test("oversized content errors before any doc blob is stored", async () => {
     const { ctx, stored, mutations } = makeEditCtx();
-    const out = await applyEditVersion(ctx, { ...baseArtifact }, "a".repeat(MAX_ARTIFACT_BYTES + 1), undefined);
+    const out = await applyEditVersion(ctx, { ...baseArtifact }, "a".repeat(MAX_DOCUMENT_BYTES + 1), undefined);
     expect(out).toEqual({ error: "Content exceeds the 8MB limit" });
     expect(stored).toHaveLength(0);
     expect(mutations).toHaveLength(0);

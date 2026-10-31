@@ -589,4 +589,7 @@ crons.interval(
 // A role hired while its drawing failed (no model credit) gets drawn later.
 crons.interval("redraw recent roles without an icon", { hours: 6 }, internal.roleIcons.redrawMissing, {});
 
+// Bundle files uploaded for a publish that never attached them (artifacts.ts).
+crons.interval("sweep unattached page uploads", { hours: 6 }, internal.artifacts.sweepUploads, {});
+
 export default crons;

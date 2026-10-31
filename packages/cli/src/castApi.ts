@@ -43,6 +43,33 @@ export async function apiPost(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ api_token: apiToken, ...body }),
   });
+  return readApiResult(response, urlPath, opts);
+}
+
+/** A 24 MB file on a slow uplink takes minutes, not the default request timeout. */
+const UPLOAD_TIMEOUT_MS = 10 * 60_000;
+
+/** POST raw bytes (a bundle file for `cast publish`), the token in the header. */
+export async function apiUpload(
+  deps: PublishDeps,
+  urlPath: string,
+  body: Blob,
+  opts: { exitOnError?: boolean } = {},
+): Promise<any> {
+  const { siteUrl, apiToken } = deps.getCliEndpoint();
+  const response = await cliFetch(`${siteUrl}${urlPath}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": body.type || "application/octet-stream" },
+    body,
+  }, { timeoutMs: UPLOAD_TIMEOUT_MS });
+  return readApiResult(response, urlPath, opts);
+}
+
+async function readApiResult(
+  response: Response,
+  urlPath: string,
+  opts: { exitOnError?: boolean; describeError?: (error: string) => string },
+): Promise<any> {
   const text = await response.text();
   let result: any;
   try {
@@ -54,8 +81,11 @@ export async function apiPost(
     console.error(message);
     process.exit(1);
   }
-  if (result?.error) {
-    const error = opts.describeError ? opts.describeError(String(result.error)) : String(result.error);
+  // A failure the backend itself answers (out of memory, a timeout) has no
+  // `error` field, only Convex's `code`, so the status decides too.
+  const raw = result?.error ?? (response.ok ? null : result?.code ?? `HTTP ${response.status}`);
+  if (raw) {
+    const error = opts.describeError ? opts.describeError(String(raw)) : String(raw);
     if (opts.exitOnError === false) throw new Error(error);
     console.error(`Error: ${error}`);
     process.exit(1);
