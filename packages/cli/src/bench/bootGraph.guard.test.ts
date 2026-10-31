@@ -299,7 +299,11 @@ describe("command groups stay off the boot graph", () => {
     // index.ts printing that message when a team has removed the device.
     // 4401 on 2026-10-29: contracts/inboxProjection.ts lifting a hidden role
     // lead whose only live work is a nested subagent (child_live).
-    expect(Math.round(graph.totalBytes / 1024), "KB of source on index.ts's static graph").toBeLessThanOrEqual(4401);
+    // 4405 on 2026-10-31: that day's ship grew files already here: castApi.ts
+    // (+1.1, publish limits), index.ts and parser.ts (+0.6 each),
+    // contracts/threadState.ts (+0.5), contracts/lineProfile.ts,
+    // analytics/events.ts and contracts/transcriptChunk.ts (+0.4 each).
+    expect(Math.round(graph.totalBytes / 1024), "KB of source on index.ts's static graph").toBeLessThanOrEqual(4405);
   }, GRAPH_WALK_TIMEOUT);
 
   test("main.ts, the process entry, reaches only the fast path", () => {
