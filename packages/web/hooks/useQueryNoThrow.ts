@@ -39,6 +39,10 @@ export const queryCircuitOpenError = new Error(
 // "try again".
 const REMEMBER_MAX = 60;
 const remembered = new Map<string, unknown>();
+/** Test seam: forgets every remembered answer (the sim resets memos between windows). */
+export function _resetRememberedResults(): void {
+  remembered.clear();
+}
 const argsKey = (args: Record<string, Value>) => JSON.stringify(convexToJson(args));
 
 /** The answer a `remember` subscription last got for these args, if any. */

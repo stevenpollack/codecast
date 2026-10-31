@@ -8,7 +8,7 @@ import { useRoomThreadUnread } from "../../hooks/useRoomThreadUnread";
 import { useCallStageOpen } from "../../lib/calls/callStage";
 import { useInboxStore } from "../../store/inboxStore";
 import type { ThreadRow } from "./roomThreadModel";
-import { openTheCall } from "./OpenCallButton";
+import { openTheCall } from "../../lib/calls/openTheCall";
 import "./arrival.css";
 
 // AN AGENT ANSWERED IN THE CALL. People are talking and watching faces, so

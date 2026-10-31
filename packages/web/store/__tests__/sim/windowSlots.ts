@@ -94,6 +94,7 @@ export const WINDOW_SLOTS: Record<string, SlotClass> = {
   "store/syncTransaction.ts:deferredFanOut": "transient",
   "store/syncTransaction.ts:timer": "transient",
   "store/syncReplication.ts:running": { shared: "the sim never calls startSyncReplication; devices wire the runtime directly" },
+  "hooks/useQueryNoThrow.ts:remembered": "memo",
   "store/chatSlice.ts:railCacheKey": "memo",
   "store/chatSlice.ts:railCacheValue": "memo",
   "store/chatSlice.ts:dmOpensInFlight": { shared: "keyed by stub ids minted from the window's own seeded stream, so windows never collide" },
@@ -370,6 +371,7 @@ const SEAMS: Record<string, () => SlotSeam> = {
 // Memo bindings, by file: each entry loads its module and returns the existing reset that drops them.
 const MEMO_RESETS: Record<string, () => () => void> = {
   "store/chatSlice.ts": () => load<typeof import("../../chatSlice")>("../../chatSlice")._resetChatRailMemo,
+  "hooks/useQueryNoThrow.ts": () => load<typeof import("../../../hooks/useQueryNoThrow")>("../../../hooks/useQueryNoThrow")._resetRememberedResults,
 };
 
 const fileOf = (key: string) => key.slice(0, key.lastIndexOf(":"));

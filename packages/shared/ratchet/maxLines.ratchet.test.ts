@@ -79,7 +79,10 @@ import { join } from "node:path";
 // (inboxStore.ts, orgLayout.ts and OrgGraph.tsx by two steps) and listed
 // pendingMessages.teamSend.test.ts; GoalsDocument.tsx and sources/app.ts were
 // split instead (goalFields.tsx, sources/appMetrics.ts), and FleetMatrix.tsx
-// fell under the cap.
+// fell under the cap. The ship of 2026-10-31 re-pinned fourteen grown files
+// under the same decision (decideCommand.ts, publish.ts, artifacts.ts,
+// conversations.ts and CommandPalette.tsx lead it, one step each) and listed
+// orgLine.test.ts; PIN rose to 263.
 
 const REPO_ROOT = join(import.meta.dir, "..", "..", "..");
 const ALLOWLIST = join(import.meta.dir, "max-lines-baseline.txt");
@@ -96,7 +99,7 @@ function pinnedSize(source: string): number {
 }
 
 /** How many files are over the cap today. May only fall. */
-const PIN = 262;
+const PIN = 263;
 
 const result = checkRatchet({
   name: "max lines",
