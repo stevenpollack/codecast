@@ -211,7 +211,7 @@ the route it took, red only where it stopped.
   (`validate -`, `show -`, a dry run). A ` ```flow ` fence draws
   `{"flow":"<slug>"}` or `{"run":"<id>"}` in any reply. The Workflow tool card
   carries "add to flows".
-- **On a session's header**, Run through lists the pool's flows that take a
+- **On a session's header**, Ship lists the pool's flows that take a
   branch, lines first, draws the picked one, and opens the shared confirm
   review: steps, agent sessions that start, questions for you, who does each
   step, the ways it can end, how to stop. Confirming asks the session to run

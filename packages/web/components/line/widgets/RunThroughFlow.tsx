@@ -1,5 +1,5 @@
 "use client";
-// "Run through" on a session (docs/architecture/flows.md FL4, FL6): the pool
+// "Ship" on a session (docs/architecture/flows.md FL4, FL6): the pool
 // of flows, each drawn on pick, and the press that asks this session to send
 // its own change through the one picked. The session does the run (it knows
 // what its change is and names its task); the review says what starts first,
@@ -44,9 +44,9 @@ function RunThroughFlowButton({ conversationId, sessionTitle }: { conversationId
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" className={`cq-sq6 ${HEADER_CHIP}`} title="Run this session's change through a flow" data-run-through>
+          <button type="button" className={`cq-sq6 ${HEADER_CHIP}`} title="Check, review and ship this session's change through a flow" data-run-through>
             <Route className="w-3 h-3" />
-            <span className="cq-sq2">Run through</span>
+            <span className="cq-sq2">Ship</span>
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-[640px] max-w-[calc(100vw-2rem)] p-0 border-sol-border bg-sol-bg" data-run-through-pool>
