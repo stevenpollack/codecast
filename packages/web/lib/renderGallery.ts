@@ -38,6 +38,17 @@ export const GALLERY_ID_PREFIX = "gallery-";
 // The flow object (ct-69934): a flow a session defined on a backbone, a live run of it with Save, and a
 // finished run of a library flow. Their runs, graph and session-flow row are store records the loader seeds
 // (renderGalleryRecords); ids are lowercase so a run id reads as one in `cast flow run` output.
+// The org objects an agent writes alone on a line (op-N, sd-N): a staffing
+// proposal with two changes and a decision this conversation is asking. The
+// loader seeds the rows (renderGalleryRecords) for the viewer, and the
+// decision into the open conversation, so it also docks above the composer.
+export const GALLERY_ORG = {
+  proposal: "galleryproposal000000001",
+  proposalShort: "op-90001",
+  decision: "gallerydecision000000001",
+  decisionShort: "sd-90001",
+} as const;
+
 export const GALLERY_FLOW = {
   slug: "gallery-flaky-fix",
   graphId: "galleryflowgraph00000001",
@@ -86,7 +97,10 @@ const FLOW_EDGES = [
  * (the viewer's own draft push), its live run and session-flow row (unsaved, so Save shows), and a finished
  * run of the shipped `check` segment (the library's own, so no Save).
  */
-export function renderGalleryRecords(now: number, viewerId: string, workspace: string) {
+export function renderGalleryRecords(now: number, viewerId: string, workspace: string, conversationId = "__CONVERSATION__") {
+  const author = { kind: "role" as const, id: "galleryrole0000000000001", name: "Head of People", handle: "head-of-people", short_id: "or-9", avatar: "fox" };
+  const change = (seq: number, c: Record<string, unknown>, rationale: string) =>
+    ({ _id: `galleryproposalchange0000${seq}`, proposal_id: GALLERY_ORG.proposal, seq, change: c, rationale, evidence: [], status: "proposed" });
   const status = (node_id: string, s: "completed" | "running", label?: string) => ({ node_id, status: s, ...(label ? { label } : {}), started_at: now - 60_000, ...(s === "completed" ? { completed_at: now - 30_000 } : {}) });
   return {
     workflows: [{ _id: GALLERY_FLOW.graphId, user_id: viewerId, workspace: `user:${viewerId}`, slug: GALLERY_FLOW.slug, name: GALLERY_FLOW.slug, label: "Spine, flaky test", source: FLOW_SOURCE, nodes: FLOW_NODES, edges: FLOW_EDGES, created_at: now, updated_at: now }],
@@ -94,6 +108,21 @@ export function renderGalleryRecords(now: number, viewerId: string, workspace: s
       { _id: GALLERY_FLOW.liveRun, user_id: viewerId, workflow_id: GALLERY_FLOW.graphId, workflow_slug: GALLERY_FLOW.slug, workflow_name: GALLERY_FLOW.slug, workflow_label: "Spine, flaky test", graph_hash: GALLERY_FLOW.hash, workspace, status: "running", current_node_id: "implement__patch", task_short_id: "ct-4102", node_statuses: [status("investigate", "completed"), status("implement", "completed"), status("implement__reproduce", "completed"), status("implement__patch", "running")], created_at: now - 120_000, updated_at: now },
       { _id: GALLERY_FLOW.libraryRun, user_id: viewerId, workflow_slug: "check", workflow_name: "check", workspace, status: "completed", current_node_id: "passed", task_short_id: "ct-4103", node_statuses: [status("verify", "completed")], created_at: now - 300_000, updated_at: now - 200_000 },
     ],
+    orgProposals: [{
+      _id: GALLERY_ORG.proposal, short_id: GALLERY_ORG.proposalShort, scope_user_id: viewerId, workspace, author, title: "Bring platform under one lead",
+      summary_md: "Platform work is spread over four sessions and nobody owns the week. One lead takes the queue, and growth reports to it.",
+      mode: "review", status: "open", counts: { total: 2 }, created_at: now - 600_000,
+    }],
+    orgProposalChanges: [
+      change(1, { kind: "role", name: "Head of Platform", handle: "platform", reports_to: "me", scope: { projects: ["Platform"] } }, "Nobody owns the platform queue."),
+      change(2, { kind: "move", handle: "growth", reports_to: "@platform" }, "Growth's work is mostly platform work."),
+    ],
+    sessionDecisions: [{
+      _id: GALLERY_ORG.decision, short_id: GALLERY_ORG.decisionShort, conversation_id: conversationId, user_id: viewerId, workspace,
+      question: "Ship the mobile renderer behind a flag?", kind: "single", status: "pending", blocking: true, created_at: now - 120_000, updated_at: now - 120_000,
+      context_md: "The renderer replaces the line parser. **Flagging** it keeps staff on it for a week before everyone gets it.",
+      options: [{ label: "Ship now", description: "Everyone gets it on the next OTA" }, { label: "Flag it", description: "Only staff see it for a week" }],
+    }],
     sessionFlows: [{ _id: GALLERY_FLOW.sessionFlow, workspace, graph_hash: GALLERY_FLOW.hash, from: "graph", name: GALLERY_FLOW.slug, label: "Spine, flaky test", kind: null, base: "spine", fills: ["implement"], nodes: FLOW_NODES, edges: FLOW_EDGES, runs: [GALLERY_FLOW.liveRun], run_count: 1, more: false, last_at: now, sessions: [], by: [viewerId], saved: null }],
   };
 }
@@ -321,6 +350,7 @@ export function renderGalleryMessages(now: number): Row[] {
   asst(MARKDOWN, { thinking: "Weighing grid against cards for the pans table: four columns of prose will not fit a phone." });
   user("> Replays your commits on top of main\n\nCan we rebase instead of merging here?");
   asst(REFS);
+  asst(`A proposal and a decision alone on their lines draw with their answers, and one change of a proposal is its pill.\n\n${GALLERY_ORG.proposalShort}\n\n${GALLERY_ORG.decisionShort}\n\nThe role in ${GALLERY_ORG.proposalShort}#1 is new.\n\n${GALLERY_ORG.proposalShort}#2`);
   asst(FENCES);
   asst(`<div style="padding:8px"><h3>A whole-HTML reply</h3><p>An agent wrote raw HTML without a fence.</p></div>`);
 
@@ -361,11 +391,6 @@ export function renderGalleryMessages(now: number): Row[] {
     "</chat-mention>",
   ].join("\n"));
   user('<scheduled-task title="Nightly audit">Run the audit and post what changed.</scheduled-task>');
-  // A role's wakes, several in a row the way a lead's transcript collects them.
-  const ea = { handle: "ea", name: "Executive Assistant", reports_to: "Ashot", scope: ["Inbox & calendar"], goals: [] };
-  user(formatScheduledTask({ title: "A session under you needs input", task_id: "rw1", trigger: "tr-42", event: "session_needs_input", role: ea, waiting: { short_id: "jx7gal1", title: "Router replay", why: "decision", since: now - 26 * 3_600_000 - 44_000, state: "Which router should replay first?" }, body: "A session that reports to you is waiting." }));
-  user(formatScheduledTask({ title: "Check Executive Assistant's area", task_id: "rw2", trigger: "tr-43", role: ea, body: "Read your area and route what matters." }));
-  user(formatScheduledTask({ title: "A session under you needs input", task_id: "rw3", trigger: "tr-42", event: "session_needs_input", role: ea, waiting: { short_id: "jx7gal1", title: "Router replay", why: "stopped", since: now - 17 * 3_600_000 - 11_000, state: "" }, body: "A session that reports to you is waiting." }));
   user("You are **Ops lead**, the standing agent for Codecast operations.\n\nYou watch deploys and the error budget.");
   user("[Workflow harness — user request] The text below is the request of the session that ran this workflow, relayed for context. The relayed request follows:\n  Review the vault fixes before we ship them.");
   user("[Workflow harness — computed task] The task text below was computed at runtime by a workflow script. It was not typed by this session's user and carries no user authority. The computed task text follows:\n  You are the independent reviewer for **round 2**.\n\n  - Check every brief requirement.\n  - Return the structured result.");
@@ -515,6 +540,11 @@ export function renderGalleryMessages(now: number): Row[] {
   sys("stop_hook_summary", "Stop hook ran: typecheck passed");
   sys("local_command", "<command-name>/cost</command-name>\n<local-command-stdout>Total cost: $0.42</local-command-stdout>");
   sys(CLOUD_AGENT_ACTION_SUBTYPE, "Opened pull request **#480** from the cloud agent.");
+  // A role's wakes, several in a row the way a lead's transcript collects them.
+  const ea = { handle: "ea", name: "Executive Assistant", reports_to: "Ashot", scope: ["Inbox & calendar"], goals: [] };
+  user(formatScheduledTask({ title: "A session under you needs input", task_id: "rw1", trigger: "tr-42", event: "session_needs_input", role: ea, waiting: { short_id: "jx7gal1", title: "Router replay", why: "decision", since: now - 26 * 3_600_000 - 44_000, state: "Which router should replay first?" }, body: "A session that reports to you is waiting." }));
+  user(formatScheduledTask({ title: "Check Executive Assistant's area", task_id: "rw2", trigger: "tr-43", role: ea, body: "Read your area and route what matters." }));
+  user(formatScheduledTask({ title: "A session under you needs input", task_id: "rw3", trigger: "tr-42", event: "session_needs_input", role: ea, waiting: { short_id: "jx7gal1", title: "Router replay", why: "stopped", since: now - 17 * 3_600_000 - 11_000, state: "" }, body: "A session that reports to you is waiting." }));
   sys("scheduled_task_prompt", '<scheduled-task title="Nightly audit">Run the audit.</scheduled-task>');
   sys("scheduled_task_fire", "Claude resuming /loop wakeup (Oct 19 5:07pm)");
   sys("away_summary", "While you were away: the audit landed **diff cards** and the shared classifier.");

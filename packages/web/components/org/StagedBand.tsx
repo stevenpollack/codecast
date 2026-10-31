@@ -10,12 +10,8 @@ import { TakeoverEdit } from "./TakeoverEdit";
 import { LedgerWord, type SubjectAnswer } from "./ProposalSubjectCard";
 
 /** The band's words: the first word in the verdict's ink, the rest quiet. */
-export function stagedWords(answer: SubjectAnswer): [string, string] {
-  if (answer.verdict === "reject") return ["Rejected.", "Sent when you send."];
-  if (answer.verdict === "note") return ["Adjust.", "Your words go back when you send."];
-  if (answer.leave_sessions) return ["Accepted,", "and the sessions stay where they are. Applies when you send."];
-  return ["Accepted.", "Applies when you send."];
-}
+export { stagedWords } from "./proposalLedgerModel";
+import { stagedWords } from "./proposalLedgerModel";
 
 const WASH: Record<SubjectAnswer["verdict"], string> = {
   approve: "color-mix(in srgb, var(--sol-green) 9%, transparent)",

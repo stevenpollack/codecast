@@ -29,15 +29,16 @@ const expression = `(() => {
   if (!id) return "open a conversation first";
   const kept = (s.messages[id] || []).filter((m) => !String(m._id).startsWith(${JSON.stringify(GALLERY_ID_PREFIX)}));
   const rows = ${JSON.stringify(rows)};
-  store.getState().applyTailMessages(id, 0, [...kept, ...rows], null);
-  // The records the flow rows draw from (their runs, graph, session-flow row), for this viewer's workspace.
+  // The records the flow and org rows draw from (runs, graph, session-flow row, a proposal, a decision), for this viewer's workspace.
   const viewer = String(s.currentUser?._id ?? "gallery-viewer");
   const team = s.clientState?.ui?.active_team_id;
-  const records = JSON.parse(${JSON.stringify(JSON.stringify(renderGalleryRecords(Date.now(), "__VIEWER__", "__WORKSPACE__")))}.split("__VIEWER__").join(viewer).split("__WORKSPACE__").join(team ? "team:" + team : "user:" + viewer));
+  const records = JSON.parse(${JSON.stringify(JSON.stringify(renderGalleryRecords(Date.now(), "__VIEWER__", "__WORKSPACE__")))}.split("__VIEWER__").join(viewer).split("__WORKSPACE__").join(team ? "team:" + team : "user:" + viewer).split("__CONVERSATION__").join(id));
   for (const [key, list] of Object.entries(records)) {
     if (rows.length) store.getState().syncTable(key, list, { isDelta: true });
-    else store.setState((st) => ({ [key]: Object.fromEntries(Object.entries(st[key] || {}).filter(([k]) => !k.startsWith("galleryflow"))) }));
+    else store.setState((st) => ({ [key]: Object.fromEntries(Object.entries(st[key] || {}).filter(([k]) => !k.startsWith("gallery"))) }));
   }
+  // After the records: a row that names one resolves it on its first render.
+  store.getState().applyTailMessages(id, 0, [...kept, ...rows], null);
   return id + ": " + (rows.length ? rows.length + " gallery rows" : "gallery cleared");
 })()`;
 

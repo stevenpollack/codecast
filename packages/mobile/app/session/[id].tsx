@@ -69,6 +69,10 @@ import { mobileEntityRoute } from '@/lib/linkRoutes';
 import { SessionActionsSheet, type SessionRow, type SessionTile } from '@/components/session/SessionActionsSheet';
 import { ModelSwitcherChip } from '@/components/ModelSwitcherChip';
 import { ApprovalCard, ApprovalPending, ApprovalSettled } from '@/components/hosted/ApprovalCard';
+import { DecisionCard } from '@/components/decisions/DecisionCard';
+import { ProposalBatchContext } from '@/components/org/ProposalCard';
+import { usePendingDecisionItems } from '@codecast/web/hooks/useDecisionQueue';
+import { attachReviewToMessage } from '@codecast/web/lib/reviewActions';
 import { hostedApprovalAnswer, hostedApprovalState, type HostedApprovalState } from '@codecast/web/lib/hostedApproval';
 import { HostedSources, HostedStep } from '@/components/hosted/Steps';
 import { ReplyChips } from '@/components/hosted/ReplyChips';
@@ -2816,13 +2820,15 @@ function MessageInput({ conversationId, isActive, isOwner, draft, autoFocus, hos
       inputRef.current as { _lastNativeText?: unknown } | null,
       message,
     ).trim();
-    if (!trimmedMessage && selectedImages.length === 0) return;
+    // Answers staged on a proposal card ride this send (lib/reviewActions), as on the web.
+    const staged = (useInboxStore.getState().reviewComments[conversationId] ?? []).length > 0;
+    if (!trimmedMessage && selectedImages.length === 0 && !staged) return;
     if (allowanceOut) return;
     setError(null);
     suggestion.settleSend(trimmedMessage);
 
     const sendImages = images.optimisticImages();
-    const content = trimmedMessage || IMAGE_ONLY_CONTENT;
+    const content = attachReviewToMessage(conversationId, trimmedMessage) || IMAGE_ONLY_CONTENT;
 
     // The bubble lands on the next frame, in a commit of its own: written
     // inside the press, it shares the composer's commit, which Reanimated
@@ -2852,7 +2858,8 @@ function MessageInput({ conversationId, isActive, isOwner, draft, autoFocus, hos
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const canSend = (!!message.trim() || selectedImages.length > 0) && !allowanceOut;
+  const stagedAnswers = useInboxStore((s) => (s.reviewComments[conversationId]?.length ?? 0) > 0);
+  const canSend = (!!message.trim() || selectedImages.length > 0 || stagedAnswers) && !allowanceOut;
   const agentStatus = managedSession?.managed ? managedSession.agent_status : undefined;
   const agentWorking = !!agentStatus && ACTIVE_AGENT_STATUSES.has(agentStatus);
   // While a turn works and the box is empty, send becomes Stop. A hosted
@@ -3270,6 +3277,17 @@ export function SessionScreen({ id, message: highlightMessageParam, focus: focus
   const internals = internalsShown && !hosted;
   const diffShown = diffSurface && !hosted;
   const approvals = useConversationApprovals(String(conversation?._id ?? id));
+  // A `cast decide` this session waits on docks above the composer, as on the web (SessionDecisionCard).
+  const pendingDecisions = usePendingDecisionItems(conversation?._id ? String(conversation._id) : null);
+  // Where a proposal card's answers collect: this conversation's send, for its owner.
+  const proposalBatch = useMemo(() => ({
+    conversationId: String(id),
+    canSend: !!conversation?.is_own,
+    send: () => {
+      const text = attachReviewToMessage(String(id), '');
+      if (text) dispatchComposerSend(String(id), text);
+    },
+  }), [id, conversation?.is_own]);
   const hostedApprovals = hosted ? approvals : NO_APPROVALS;
   // The family look's jump arrows are solid sheet discs, as its other
   // controls are: the developer's ghost disc reads as a smudge over the
@@ -4680,7 +4698,7 @@ export function SessionScreen({ id, message: highlightMessageParam, focus: focus
   };
 
   return (
-    <>
+    <ProposalBatchContext.Provider value={proposalBatch}>
       <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView
         // iOS: KAV 'padding' (resets cleanly via keyboardWillHide). Android:
@@ -5183,6 +5201,9 @@ export function SessionScreen({ id, message: highlightMessageParam, focus: focus
             That overlay used to be a full-width absolute layer on the KAV
             whose bottom inset was a guessed composer height; with the
             keyboard open the send button sat inside it and the overlay won. */}
+        {!hosted && pendingDecisions[0]?.decisionId ? (
+          <DecisionCard key={pendingDecisions[0].decisionId} decisionRef={pendingDecisions[0].decisionId} docked />
+        ) : null}
         <RNView style={styles.composerLayer}>
           <MessageInput
             conversationId={id as Id<"conversations">}
@@ -5260,7 +5281,7 @@ export function SessionScreen({ id, message: highlightMessageParam, focus: focus
         visible={galleryVisible}
         onClose={() => setGalleryVisible(false)}
       />
-    </>
+    </ProposalBatchContext.Provider>
   );
 }
 

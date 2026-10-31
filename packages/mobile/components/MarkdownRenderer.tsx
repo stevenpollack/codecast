@@ -25,10 +25,12 @@ import { DIFF_FENCE } from '@codecast/web/lib/castDiff';
 import { FLOW_FENCE_LANG, readFlowFence } from '@codecast/web/lib/line/flowFence';
 import { FlowCard, FlowRunCard } from './session/FlowCard';
 import { EntityPill } from './EntityPill';
+import { ProposalCard } from './org/ProposalCard';
+import { DecisionCard } from './decisions/DecisionCard';
 import { SearchHighlightContext, markedRuns } from './search/highlight';
 import { parseMarkdown, plainText, planTable } from '@/lib/markdown';
 import type { Nodes, Paragraph, Image, List, Table } from 'mdast';
-import { parseEntityUrl, isEntityId, parsePublishedPageUrl, parseClaudeArtifactUrl, BARE_ID_AFTER, BARE_ID_BEFORE, BARE_ID_SOURCE, MENTION_ID_SOURCE, type EntityType } from '@codecast/shared/entities';
+import { parseEntityUrl, isEntityId, entityTypeFromId, parseProposalChangeRef, parsePublishedPageUrl, parseClaudeArtifactUrl, BARE_ID_AFTER, BARE_ID_BEFORE, BARE_ID_SOURCE, MENTION_ID_SOURCE, type EntityType } from '@codecast/shared/entities';
 // Canonical "★ Insight ─────" parser shared with web (pure string/regex module,
 // Hermes-safe). Mobile used to carry its own narrower copy in session/[id].tsx
 // which silently missed most real-world insight forms — one parser, one truth.
@@ -371,6 +373,13 @@ function soloReference(p: Paragraph): SoloRef | null {
 function SoloRefCard({ solo, isUser }: { solo: SoloRef; isUser: boolean }) {
   const Theme = useTheme();
   if (solo.kind === 'entity') {
+    // A proposal and a decision read as the cards the web transcript draws,
+    // with their answers right there. One change of a proposal (`op-55#3`)
+    // stays its pill, as on the web.
+    const ref = solo.shortId ?? solo.id;
+    const type = solo.type ?? (solo.shortId ? entityTypeFromId(solo.shortId) : null);
+    if (ref && type === 'proposal' && !parseProposalChangeRef(ref)) return <ProposalCard refId={ref} />;
+    if (ref && type === 'decision') return <DecisionCard decisionRef={ref} />;
     return (
       <RNView style={mdStyles.refCard}>
         <EntityPill shortId={solo.shortId} type={solo.type} id={solo.id} />

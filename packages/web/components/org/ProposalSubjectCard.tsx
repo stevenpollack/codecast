@@ -142,16 +142,14 @@ export function LedgerClosingRow({ left, right, above, outcome, sticky, classNam
 /** This card's pending answer, as the batch holds it. `leave_sessions` is
  *  the person's one edit on an approval that would take sessions over (R1):
  *  leave them where they are. */
-export type SubjectAnswer = { verdict: OrgReplyVerdict; text?: string; leave_sessions?: boolean };
+export type { SubjectAnswer } from "./proposalLedgerModel";
+import type { SubjectAnswer } from "./proposalLedgerModel";
 
 /** The test hooks a host puts on a shared piece (`data-subject-you`, `data-proposal-reply-field`). */
 type DataHooks = { [hook: `data-${string}`]: string | boolean | undefined };
 
-export const FIELD_ASKS: Record<OrgReplyVerdict, string> = {
-  reject: "Why not? Say what you want instead.",
-  approve: "Say something about this change",
-  note: "What should change?",
-};
+export { FIELD_ASKS } from "./proposalLedgerModel";
+import { FIELD_ASKS } from "./proposalLedgerModel";
 
 /**
  * The reply field: two rows of the ledger's type on a hairline box, growing

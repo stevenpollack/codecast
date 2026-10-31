@@ -5,6 +5,7 @@ import { useQueryNoThrow } from '@codecast/web/hooks/useQueryNoThrow';
 import { api as _api } from '@codecast/convex/convex/_generated/api';
 import { useInboxStore } from '@codecast/web/store/inboxStore';
 import { findEntityInStore, entityTypeInStore } from '@codecast/web/lib/liveEntities';
+import { useSyncOrgProposal } from '@codecast/web/hooks/useSyncOrgProposals';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { Theme, useTheme } from '@/constants/Theme';
@@ -165,7 +166,13 @@ export function EntityPill({ shortId, type: typeProp, id: idProp, fallback }: { 
   const replayRef = type === 'replay' ? parseReplayRef(rawId) : null;
   const replay = useQueryNoThrow(api.replays.webGetReplay, type === 'replay' && !named ? { ref: replayRef?.replay ?? rawId } : 'skip').data;
 
-  const served: any = type === 'task' ? task : type === 'plan' ? plan : isSession ? session : type === 'trigger' ? trigger : type === 'doc' ? doc : type === 'call' ? call : type === 'source' ? source : type === 'replay' ? replay : undefined;
+  // A proposal (`op-N`, or one change `op-N#k`) is store-fed, as on the web:
+  // the feeder syncs its row and changes, and the pill reads the row's title back.
+  const proposalRef = type === 'proposal' && !named ? parseProposalChangeRef(rawId)?.proposal ?? rawId : null;
+  useSyncOrgProposal(proposalRef);
+  const proposal = useInboxStore((s) => (proposalRef ? findEntityInStore(s, 'proposal', rawId) : undefined));
+
+  const served: any = type === 'proposal' ? proposal : type === 'task' ? task : type === 'plan' ? plan : isSession ? session : type === 'trigger' ? trigger : type === 'doc' ? doc : type === 'call' ? call : type === 'source' ? source : type === 'replay' ? replay : undefined;
 
   const entity: any = served ?? seed;
 

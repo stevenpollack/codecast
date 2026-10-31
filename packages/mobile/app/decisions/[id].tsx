@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Text, TextInput } from '@/components/Themed';
@@ -18,10 +18,8 @@ import type { AnswerDraft } from '@codecast/web/lib/decisionAnswer';
 import { AnswerButton, AnswerControls, appAnswerLook } from '@/components/decisions/AnswerControls';
 import { decisionAnswerLabel } from '@codecast/shared/contracts';
 import { approvesSecretRead } from '@codecast/shared/contracts/secrets';
-import { confirmPresence } from '@/lib/presence';
 import { DecisionThread } from '@/components/decisions/DecisionThread';
-
-const pageUrl = (slug: string) => `https://codecast.sh/a/${slug}`;
+import { reportUrl, useDecisionAnswer } from '@/components/decisions/DecisionCard';
 
 // One `cast decide` at a time. The queue (useDecisionQueue) is the same model
 // web's stepper walks; this screen shows the decision named in the route and,
@@ -55,7 +53,6 @@ export default function DecisionScreen() {
 
   const [draft, patchDraft] = useDecisionDraft<AnswerDraft>(decisionId);
   const [handoff, setHandoff] = useState<'pass' | 'escalate' | null>(null);
-  const answerDecision = useInboxStore((s) => s.answerDecision);
   const look = appAnswerLook(Theme);
 
   // The next decision after this one, wrapping, never this one.
@@ -72,28 +69,7 @@ export default function DecisionScreen() {
   }, [nextId, router]);
 
   const source = item ?? row;
-  // Approving an Ask first read takes Touch ID first (lib/presence); one
-  // confirmation at a time, so a second press while the sheet is up is a no-op.
-  const confirming = useRef(false);
-  const answer = useCallback(async (input: DecisionAnswerInput) => {
-    if (source && 'index' in input && input.index !== undefined && approvesSecretRead(source, input.index)) {
-      if (confirming.current) return;
-      confirming.current = true;
-      try {
-        const presence = await confirmPresence('approve', decisionId);
-        if (!presence) return;
-        input = { ...input, presence };
-      } catch (e) {
-        Alert.alert('Touch ID', (e as Error).message);
-        return;
-      } finally {
-        confirming.current = false;
-      }
-    }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    answerDecision(decisionId, input);
-    goNext();
-  }, [answerDecision, decisionId, goNext, source]);
+  const answer = useDecisionAnswer(source, decisionId, goNext);
 
   if (!source) {
     return (
@@ -157,7 +133,7 @@ export default function DecisionScreen() {
               {docBody && docBody !== contextMd?.trim() ? <MarkdownContent text={docBody} baseStyle={styles.context} /> : null}
             </CollapsibleBody>
           ) : null}
-          {reportSlug ? <LinkRow label="Open the report" onPress={() => openLink(pageUrl(reportSlug))} /> : null}
+          {reportSlug ? <LinkRow label="Open the report" onPress={() => openLink(reportUrl(reportSlug))} /> : null}
 
           <AnswerControls decisionId={decisionId} decision={{ options, form: source.form, kind }} onAnswer={answer} look={look} proceedingWith={blocking ? undefined : defaultOption} guarded={(i) => approvesSecretRead(source, i)} />
 
