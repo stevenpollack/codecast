@@ -149,6 +149,54 @@ exit 1
     expect(r.json.why).not.toContain("intro.txt");
   });
 
+  test("an untracked copy of a file the default branch now tracks moves aside, and the rebase goes on", () => {
+    // ct-74465: the run's worktree held an untracked copy of a file main had since tracked.
+    landOnMain("team-kit.md", "tracked on main\n", "main tracks team-kit.md");
+    fs.writeFileSync(path.join(work, "team-kit.md"), "an untracked copy\n");
+    fs.writeFileSync(path.join(work, "draft.md"), "untracked, not on main\n");
+    const r = station();
+    expect(r.code).toBe(0);
+    expect(r.json).toMatchObject({ rebased: true, landed: false });
+    expect(fs.readFileSync(path.join(work, "team-kit.md"), "utf-8")).toBe("tracked on main\n");
+    const [attempt] = fs.readdirSync(path.join(root, "run", "aside"));
+    expect(fs.readFileSync(path.join(root, "run", "aside", attempt, "team-kit.md"), "utf-8")).toBe("an untracked copy\n");
+    expect(fs.readFileSync(path.join(work, "draft.md"), "utf-8")).toBe("untracked, not on main\n");
+    expect(r.comments).toContain("Moved 1 untracked file(s) that origin/main tracks");
+  });
+
+  test("files moved aside go back into the worktree when the rebase conflicts or the check fails", () => {
+    landOnMain("intro.txt", "something else entirely\n", "a conflicting change");
+    landOnMain("kit é.md", "tracked on main\n", "main tracks kit é.md");
+    fs.writeFileSync(path.join(work, "kit é.md"), "an untracked copy\n");
+    expect(station().code).toBe(1);
+    expect(fs.readFileSync(path.join(work, "kit é.md"), "utf-8")).toBe("an untracked copy\n");
+
+    git(work, "reset", "-q", "--hard", "origin/codecast/line-ct-1");
+    landOnMain("intro.txt", "say who offers what\n", "main puts intro.txt back");
+    landOnMain("other.txt", "y\n", "someone else's change");
+    const r = station("echo the check is red; false");
+    expect(r.code).toBe(1);
+    expect(r.json).toMatchObject({ rebased: true, landed: false });
+    expect(fs.readFileSync(path.join(work, "kit é.md"), "utf-8")).toBe("an untracked copy\n");
+  });
+
+  test("a rebase git refuses to start is reported with git's reason, never as a conflict", () => {
+    const before = git(work, "rev-parse", "HEAD");
+    landOnMain("other.txt", "y\n", "someone else's change");
+    fs.writeFileSync(path.join(work, ".git", "index.lock"), "");
+    const r = station();
+    fs.rmSync(path.join(work, ".git", "index.lock"));
+    expect(r.code).toBe(1);
+    expect(r.json).toMatchObject({ rebased: false, landed: false });
+    expect(r.json.why).toStartWith("rebase could not start: ");
+    expect(r.json.why).toContain("index.lock");
+    expect(r.json.why).not.toContain("conflicted");
+    expect(r.comments).toContain("could not start");
+    expect(r.comments).toContain("the rebase then has to run again");
+    expect(r.comments).not.toContain("ship__rebase");
+    expect(git(work, "rev-parse", "HEAD")).toBe(before);
+  });
+
   test("a check that fails on the rebased branch goes back to implement, and the branch returns to where it was", () => {
     const before = git(work, "rev-parse", "HEAD");
     landOnMain("other.txt", "y\n", "someone else's change");
