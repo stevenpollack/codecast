@@ -102,6 +102,17 @@ export const CODECAST_EVENTS = defineCatalog({
 
   // Sync log health.
   synclog_apply: { direct: COUNT, refetch: COUNT, ratio: COUNT },
+
+  // A desktop app process died: a window's renderer or a helper such as the
+  // GPU process. The only record that leaves the machine when a window goes
+  // blank. `window` is a role or a route's first segment, never a URL.
+  desktop_process_gone: {
+    process: { type: "string", max: 32 },
+    reason: { type: "string", max: 32 },
+    exit_code: COUNT,
+    window: { type: "string", max: 32 },
+    visible: { type: "boolean" },
+  },
   synclog_crawl_healed: { namespace: { type: "string", values: ["tasks", "docs"] }, count: COUNT },
 
   // Inbox digest compare: does the client's own projection agree with the

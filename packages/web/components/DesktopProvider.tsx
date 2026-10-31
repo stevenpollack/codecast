@@ -29,7 +29,9 @@ import {
   isSatelliteWindow,
   navigateFromHere,
   onCallPanelHandback,
-  onVoiceMirror } from "../lib/desktop";
+  onVoiceMirror,
+  onShellProcessGone } from "../lib/desktop";
+import { track } from "../lib/analytics";
 import { runPlaced } from "../lib/desktopApps";
 import { deepLinkSessionId } from "../lib/pathLabel";
 import { cleanNotificationBody } from "../lib/notificationText";
@@ -253,6 +255,9 @@ export function DesktopProvider() {
     void import("../lib/calls/meetingOffers").then(({ installMeetingOfferListener }) => {
       installMeetingOfferListener();
     });
+
+    // A dead window or GPU process leaves no other trace off the machine.
+    onShellProcessGone((report) => track("desktop_process_gone", report));
 
     // The call panel closing hands its huddle back here.
     //

@@ -177,6 +177,8 @@ declare global {
       // answer and the recording are the web layer's. All absent on older
       // builds — gate on them, and the feature simply does not exist there.
       onMeetingDetected?: (cb: (offer: MeetingOffer) => void) => void;
+      // A process of this app died (main window only). Absent on older builds.
+      onShellProcessGone?: (cb: (report: ShellProcessGone) => void) => void;
       // Edit > Undo/Redo (or its ⌘Z) with focus outside a text field: the
       // menu takes the key before the page, so the shell hands the press to
       // the app's undo (packages/electron/editUndo.js). Absent on older builds.
@@ -890,6 +892,20 @@ export function onVoiceMirror(cb: (payload: VoiceMirror) => void): void {
   bridge("onVoiceMirror")?.(cb);
 }
 
+/** One dead process of the desktop app, as the shell reports it. */
+export type ShellProcessGone = {
+  process: string;
+  reason: string;
+  exit_code: number;
+  window: string;
+  visible: boolean;
+};
+
+/** Main window: each process of the app that died, including before this page loaded. */
+export function onShellProcessGone(cb: (report: ShellProcessGone) => void): void {
+  bridge("onShellProcessGone")?.(cb);
+}
+
 
 /** Host: a ring is up (or has stopped) — the dock bounces beside it. */
 export function setRingAttention(on: boolean): void {
@@ -1447,22 +1463,45 @@ const TRAFFIC_LIGHTS_W = 78;
 const TRAFFIC_LIGHTS_H = 24;
 // Rows starting within this band act as the titlebar (drag surface).
 const TITLEBAR_H = 36;
+// Zen's toggle sits in the titlebar band exactly where the top bar's toggle
+// sits outside zen (the bar's inset plus its 12px padding), so entering and
+// leaving is one spot; rows at the left edge clear it too.
+const ZEN_TOGGLE_LEFT_DESKTOP = TRAFFIC_LIGHTS_W + 12;
+const ZEN_TOGGLE_LEFT_WEB = 12;
+const ZEN_TOGGLE_SIZE = 28;
+const ZEN_TOGGLE_GAP = 6;
 
-// A framed desktop window without the global header (the call window on older
-// builds) still needs a surface to drag by and the traffic lights cleared, so
-// its top row plays that role: while it lies in the titlebar band it becomes
-// the drag region (the .titlebar-head rules), and when it also sits at the
-// window's left edge it indents past the lights. Re-measured when the row
-// resizes and when it moves through the band.
-export function attachTitlebarHead(el: HTMLElement): () => void {
+export function zenToggleLeft(): number {
+  return isElectron() ? ZEN_TOGGLE_LEFT_DESKTOP : ZEN_TOGGLE_LEFT_WEB;
+}
+
+/** The width of the top-left corner zen reserves: lights (desktop) + toggle. */
+export function zenCornerWidth(): number {
+  // A phone has no corner toggle (zen's controls are desktop width only).
+  if (!isElectron() && window.innerWidth < 768) return 0;
+  return zenToggleLeft() + ZEN_TOGGLE_SIZE + ZEN_TOGGLE_GAP;
+}
+
+// Zen mode hides the global header, yet the window still needs a surface to
+// drag by and its top-left corner cleared: on the desktop the traffic lights
+// and the zen toggle sit there, on the web just the toggle (ZenCorner). Rather
+// than a dedicated strip, the top row of whatever surface is showing plays the
+// titlebar: while it lies in the titlebar band it becomes the drag region (the
+// .titlebar-head rules), and when it also sits at the window's left edge it
+// indents past the corner. Both are measured, not declared, because which row
+// is topmost and leftmost depends on layout: a tab bar, a breadcrumb trail, or
+// a rail may or may not be open. Re-measured when the row resizes and when it
+// moves through the band. The chromeless call window's older framed builds
+// use the same rule with the lights alone as the corner.
+export function attachTitlebarHead(el: HTMLElement, corner: number = TRAFFIC_LIGHTS_W): () => void {
   const measure = () => {
     const r = el.getBoundingClientRect();
     const inBand = r.width > 0 && r.top < TITLEBAR_H;
-    const edge = inBand && r.top < TRAFFIC_LIGHTS_H && r.left < TRAFFIC_LIGHTS_W;
-    // Indent only past the part of the lights this row actually sits under
-    // (a row beside a 44px rail needs 34px, not 78). A row too narrow to indent
-    // (an icon-only rail) drops below the lights instead.
-    const inset = TRAFFIC_LIGHTS_W - Math.max(0, r.left);
+    const edge = inBand && r.top < TRAFFIC_LIGHTS_H && r.left < corner;
+    // Indent only past the part of the corner this row actually sits under
+    // (a row beside a 44px rail needs less than one at the edge). A row too
+    // narrow to indent (an icon-only rail) drops below the corner instead.
+    const inset = corner - Math.max(0, r.left);
     const fits = r.width >= inset + 40;
     el.classList.toggle("titlebar-head", inBand);
     el.classList.toggle("titlebar-head--edge", edge && fits);
@@ -1493,7 +1532,7 @@ export function attachTitlebarHead(el: HTMLElement): () => void {
     const threshold = Array.from({ length: 11 }, (_, i) => i / 10);
     observers = [
       `0px 0px ${TITLEBAR_H - window.innerHeight}px 0px`,
-      `0px ${TRAFFIC_LIGHTS_W - window.innerWidth}px ${TITLEBAR_H - window.innerHeight}px 0px`,
+      `0px ${corner - window.innerWidth}px ${TITLEBAR_H - window.innerHeight}px 0px`,
     ].map((rootMargin) => {
       const io = new IntersectionObserver(kick, { rootMargin, threshold });
       io.observe(el);

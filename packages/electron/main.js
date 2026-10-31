@@ -84,7 +84,7 @@ const { createDaemonSetup } = require("./daemonSetup");
 const { createShellAuthority, originOf, trustedShellUrl, installShellCapabilities } = require("./shellAuthority");
 const { createEditUndo } = require("./editUndo");
 const { createMenuKeys } = require("./menuKeys");
-const { recoveryPageUrl, isRecoveryUrl, attachCrashRecovery } = require("./shellRecovery");
+const { recoveryPageUrl, isRecoveryUrl, attachCrashRecovery, attachGpuRecovery } = require("./shellRecovery");
 const { createBrowserPanes, defaultRegistryPath: defaultPaneRegistryPath } = require("./browserPanes");
 const { createShareCursors } = require("./shareCursors");
 const { attachSpellMenu } = require("./spellMenu");
@@ -165,8 +165,66 @@ function createShellWindow(options) {
     const webPreferences = { ...prefs, additionalArguments: [...(prefs.additionalArguments ?? []), "--transparent-window"] };
     options = { ...options, webPreferences };
   }
-  return shellAuthority.register(new BrowserWindow(options));
+  const win = shellAuthority.register(new BrowserWindow(options));
+  attachCrashRecovery(win, {
+    isQuitting: () => appIsQuitting,
+    fallbackUrl: () => `${currentBaseUrl}/inbox`,
+    quiet: !!options.transparent,
+    onGone: (details, url) => {
+      reportProcessGone(details, windowLabel(win, url), win.isVisible());
+      // A dead spare is not worth reviving: a fresh one is built in its place.
+      if (win !== spareTabWindow) return false;
+      dropSpareTabWindow();
+      warmSpareTabWindow();
+      return true;
+    },
+  });
+  return win;
 }
+
+// Which window a report is about, by its role or the first segment of its
+// route ("conversation", "palette", "call-panel"); never a full URL.
+function windowLabel(win, url) {
+  if (win === mainWindow) return "main";
+  if (win === spareTabWindow) return "spare";
+  try {
+    return new URL(url ?? win.webContents.getURL()).pathname.split("/")[1] || "root";
+  } catch {
+    return "unknown";
+  }
+}
+
+// Every process that died, held until the main window's page can report it.
+// Nothing else leaves the machine when a window goes blank, so without this a
+// report like "the window went dark and Cmd-R didn't fix it" has no evidence.
+const pendingProcessGone = [];
+function reportProcessGone(details, window, visible) {
+  if (pendingProcessGone.length >= 20) pendingProcessGone.shift();
+  pendingProcessGone.push({
+    process: String(details?.type ?? "renderer").slice(0, 32),
+    reason: String(details?.reason ?? "unknown").slice(0, 32),
+    exit_code: Number(details?.exitCode ?? -1),
+    window,
+    visible,
+  });
+  // The main window's own report waits for its page to come back.
+  if (window !== "main") flushProcessGone();
+}
+
+function flushProcessGone() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const wc = mainWindow.webContents;
+  if (wc.isCrashed() || wc.isLoadingMainFrame() || isRecoveryUrl(wc.getURL())) return;
+  for (const report of pendingProcessGone.splice(0)) wc.send("shell-process-gone", report);
+}
+
+attachGpuRecovery(app, {
+  isQuitting: () => appIsQuitting,
+  windows: () => BrowserWindow.getAllWindows(),
+  keep: (win) => win.webContents.getURL().includes("/call-panel"),
+  // Renderers report through their window above; this hears the rest.
+  onGone: (details) => reportProcessGone(details, "app", true),
+});
 
 function getSettingsPath() {
   return path.join(app.getPath("userData"), "settings.json");
@@ -392,11 +450,6 @@ function createWindow() {
     }, 500);
   });
 
-  attachCrashRecovery(mainWindow, {
-    isQuitting: () => appIsQuitting,
-    fallbackUrl: () => `${currentBaseUrl}/inbox`,
-  });
-
   startLoad();
 
   mainWindow.once("ready-to-show", () => {
@@ -408,6 +461,7 @@ function createWindow() {
     stallTimer = null;
     if (isRecoveryUrl(mainWindow.webContents.getURL())) return;
     loadAttempts = 0;
+    flushProcessGone();
     mainWindow.webContents.setZoomFactor(getAutoZoomFactor());
     mainWindow.webContents.executeJavaScript(
       "document.documentElement.classList.add('electron-desktop')"

@@ -49,6 +49,8 @@ class FakeWindow {
       setWindowOpenHandler: () => {},
       getURL: () => this.url ?? "https://codecast.sh/",
       reloadIgnoringCache: () => {},
+      reload: () => this.record("reload"),
+      isLoadingMainFrame: () => false,
       openDevTools: () => {},
       session: { clearCache: () => Promise.resolve() },
     });

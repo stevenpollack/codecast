@@ -62,6 +62,11 @@ const onVoiceMirror = bufferedChannel(ipcRenderer, "voice-mirror", { latest: tru
 // person just sat down to a meeting.
 const onMeetingDetected = bufferedChannel(ipcRenderer, "meeting-detected");
 
+// A process of this app died (a window's renderer, the GPU process). Sent only
+// to the main window, which reports it; buffered because the report usually
+// arrives while the page is still booting after the crash it describes.
+const onShellProcessGone = bufferedChannel(ipcRenderer, "shell-process-gone");
+
 contextBridge.exposeInMainWorld("__CODECAST_ELECTRON__", {
   ...shared,
   // OS-level permissions, read from the OS itself (osPermissions.js):
@@ -181,6 +186,7 @@ contextBridge.exposeInMainWorld("__CODECAST_ELECTRON__", {
   // app starts. The ANSWER lives here in the web layer — main never starts a
   // recording, it only says a meeting looks like it began.
   onMeetingDetected,
+  onShellProcessGone,
   // Edit > Undo/Redo (or its ⌘Z) pressed while focus was not in a text field:
   // the menu takes the key before the page, so the shell hands the press to
   // the web app's undo (editUndo.js). Returns an unsubscribe.
