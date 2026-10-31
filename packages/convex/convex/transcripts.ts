@@ -1304,7 +1304,9 @@ export function callSummaryRequest(
     : `This is the transcript of a team huddle (voice call)${durationMin ? `, about ${durationMin} min` : ""}${call.rolling ? ", still going: summarize what has been said so far" : ""}. Speakers are exactly attributed.`;
   return {
     model: CHEAP_MODEL,
-    max_tokens: 700,
+    // A two-hour call's reply runs past 500 tokens; a cut-off reply has no
+    // closing brace and fails the summary.
+    max_tokens: 1500,
     prompt: `${preamble}
 
 Write JSON only, this shape:
@@ -1571,6 +1573,7 @@ export const generateSummary = internalAction({
       if (!response) throw new Error("ANTHROPIC_API_KEY not configured");
       if (!response.ok) throw new Error(`Anthropic ${response.status}: ${(await response.text()).slice(0, 300)}`);
       const data = await response.json();
+      if (data.stop_reason === "max_tokens") throw new Error(`Reply cut off at max_tokens (${data.usage?.output_tokens} tokens)`);
       await ctx.runMutation(internal.transcripts.setSummary, {
         transcript_id: args.transcript_id,
         summary_status: "done",
