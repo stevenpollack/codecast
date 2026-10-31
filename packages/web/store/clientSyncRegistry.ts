@@ -883,6 +883,18 @@ export const CLIENT_SYNC_REGISTRY = {
     sync: { isDelta: true },
     feeds: ["lineTimeline.page"],
   },
+  // Every session the viewer owns, as a small directory the ⌘K palette
+  // searches on the device (convex sessionIndex.page): title, what it began
+  // as, its summary and project, when it last moved. The sessions cache keeps
+  // about a month; this keeps them all, a few hundred bytes each. Paged,
+  // never subscribed (the range spans every running session's heartbeat), so
+  // delta. Rows the sessions cache also holds are read from there first.
+  sessionIndex: {
+    persistence: { kind: "collection", key: "sessionIndex" },
+    hydration: { phase: "deferred" },
+    sync: { isDelta: true },
+    feeds: ["sessionIndex.page"],
+  },
   // The viewer's chat with a project's line (convex lineChat.thread): who
   // answers it and each ask with its reply, one row per project, keyed by
   // the project id. Delta: each workspace feeds its own project's row.
@@ -1225,6 +1237,17 @@ export const CLIENT_SYNC_REGISTRY = {
       "externalEvents.listForProject",
       "externalEvents.listForRepository",
     ],
+  },
+  // The Prompts page (convex userSends.teamDay): what the team's people typed
+  // into sessions, one team day per answer. Keyed `ps:<message id>`, a client
+  // key, so the feeder's dropAbsent removes a row from disk when its session
+  // stops being visible. Delta: each answer is complete for its own day only.
+  teamPrompts: {
+    persistence: { kind: "collection", key: "teamPrompts" },
+    hydration: { phase: "deferred" },
+    sync: { isDelta: true },
+    indexes: "_id, team_id, date",
+    feeds: ["userSends.teamDay"],
   },
   // The Changes page (docs/proposals/changes-page.md 8.3). Team-only rows
   // with no `workspace` key: the server gates every read on membership, and
@@ -1983,6 +2006,7 @@ export const REPLICATION_CLASSIFICATION: Record<ClientSyncStoreKey, "shared" | "
   sessionFlows: "shared",
   flowMaps: "shared",
   lineTimeline: "shared",
+  sessionIndex: "shared",
   lineCards: "shared",
   lineChats: "shared",
   lineTries: "shared",
@@ -2020,6 +2044,7 @@ export const REPLICATION_CLASSIFICATION: Record<ClientSyncStoreKey, "shared" | "
   changeStories: "shared",
   changeEditions: "shared",
   changeLive: "shared",
+  teamPrompts: "shared",
   changeWorks: "shared",
   changeStorySessions: "shared",
   managedSessions: "shared",

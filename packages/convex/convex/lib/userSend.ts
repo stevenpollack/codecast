@@ -88,6 +88,8 @@ type SendMessage = {
   queued?: "person" | "program";
 };
 type Send = { user_id: Id<"users">; team_id?: Id<"teams">; words: number };
+// Which message a counted send is, for the per-send log (user_sends).
+type SendAt = { conversation_id: Id<"conversations">; message_id: Id<"messages">; timestamp: number };
 
 export function queuedBy(pending: { human?: boolean } | null | undefined): SendMessage["queued"] {
   return pending ? (pending.human ? "person" : "program") : undefined;
@@ -167,6 +169,7 @@ export async function scheduleUserSend(
   await ctx.scheduler.runAfter(LAUNCH_LINK_GRACE_MS, internal.userSends.record, {
     ...send,
     conversation_id: conversation._id,
+    message_id: msg._id,
     by_person: msg.queued === "person",
     timestamp,
   });
@@ -174,17 +177,43 @@ export async function scheduleUserSend(
 }
 
 // Count a classified send, unless a program launched its session and no
-// person queued the message.
+// person queued the message, and log which message it was (user_sends).
 export async function recordSendFor(
   ctx: { db: any },
   conversation: Doc<"conversations">,
   send: Omit<Send, "team_id">,
   byPerson: boolean,
   timestamp: number,
+  messageId?: Id<"messages">,
 ): Promise<boolean> {
   if (!byPerson && isProgramLaunched(conversation)) return false;
-  await recordUserSend(ctx, { ...send, team_id: await resolveCounterTeam(ctx, conversation) }, timestamp);
+  const counted = { ...send, team_id: await resolveCounterTeam(ctx, conversation) };
+  await recordUserSend(ctx, counted, timestamp);
+  if (messageId) await logUserSend(ctx, counted, { conversation_id: conversation._id, message_id: messageId, timestamp });
   return true;
+}
+
+// A prompt longer than this is clipped in the log; the session holds the rest.
+export const SEND_TEXT_CAP = 8000;
+
+// The prompt as the Prompts page shows it: tags and mention context out,
+// pasted blocks kept, clipped to SEND_TEXT_CAP.
+export function sendText(content: string): { text: string; clipped: boolean } {
+  const full = stripMessageTags(stripMentionContext(content));
+  return { text: full.slice(0, SEND_TEXT_CAP), clipped: full.length > SEND_TEXT_CAP };
+}
+
+// One user_sends row per message: a message the insert path sees twice is
+// still one send on the Prompts page.
+async function logUserSend(ctx: { db: any }, send: Send, at: SendAt): Promise<void> {
+  const existing = await ctx.db
+    .query("user_sends")
+    .withIndex("by_message", (q: any) => q.eq("message_id", at.message_id))
+    .first();
+  if (existing) return;
+  const message = await ctx.db.get(at.message_id);
+  if (!message?.content || message.is_encrypted) return;
+  await ctx.db.insert("user_sends", { user_id: send.user_id, team_id: send.team_id, words: send.words, ...at, ...sendText(message.content) });
 }
 
 export async function maybeRecordUserSend(
@@ -195,7 +224,7 @@ export async function maybeRecordUserSend(
 ): Promise<boolean> {
   const send = classifyUserSend(conversation, msg);
   if (!send || (await isCommandBody(ctx, conversation._id, msg, timestamp))) return false;
-  return recordSendFor(ctx, conversation, send, msg.queued === "person", timestamp);
+  return recordSendFor(ctx, conversation, send, msg.queued === "person", timestamp, msg._id);
 }
 
 // Bump the (user, team, UTC day) counter row.

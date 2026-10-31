@@ -100,3 +100,50 @@ test("a slash command's body is not typed, a long message after it is", async ()
   expect(await maybeRecordUserSend({ db }, conversation, { _id: "messages_body" as any, role: "user", content: body }, 1000)).toBe(false);
   expect(await maybeRecordUserSend({ db }, conversation, { _id: "messages_later" as any, role: "user", content: body }, 60_000)).toBe(true);
 });
+
+// The Prompts page reads the per-send log, one row per counted message.
+test("a counted send is logged once with its prompt text; an uncounted one is not", async () => {
+  const conversation = { _id: "conversations_a", user_id: "users_owner", team_id: "teams_team" } as any;
+  const db = makeFakeDb({
+    conversations: [conversation],
+    messages: [
+      { _id: "messages_typed", conversation_id: "conversations_a", role: "user", timestamp: 1, content: "<system-reminder>x</system-reminder>\nfix the login bug" },
+      { _id: "messages_nudge", conversation_id: "conversations_a", role: "user", timestamp: 2, content: "continue" },
+    ],
+    user_send_daily: [],
+    user_sends: [],
+  });
+  const typed = { _id: "messages_typed" as any, role: "user", content: "<system-reminder>x</system-reminder>\nfix the login bug" };
+  expect(await maybeRecordUserSend({ db }, conversation, typed, 1)).toBe(true);
+  expect(await maybeRecordUserSend({ db }, conversation, typed, 1)).toBe(true);
+  expect(await maybeRecordUserSend({ db }, conversation, { _id: "messages_nudge" as any, role: "user", content: "continue" }, 2)).toBe(false);
+  expect(db._tables.user_sends).toHaveLength(1);
+  expect(db._tables.user_sends[0]).toMatchObject({ user_id: "users_owner", team_id: "teams_team", message_id: "messages_typed", text: "fix the login bug", clipped: false });
+});
+
+test("the team day shows the viewer's own sends and a teammate's only from team-visible sessions", async () => {
+  const send = (id: string, user: string, conv: string, text: string) =>
+    ({ _id: `user_sends_${id}`, user_id: user, team_id: "teams_t", conversation_id: conv, message_id: `messages_${id}`, timestamp: Date.parse("2026-10-29T15:00:00Z"), words: 1, text, clipped: false });
+  const db = makeFakeDb({
+    team_memberships: [
+      { _id: "m1", team_id: "teams_t", user_id: "users_me", visibility: "full" },
+      { _id: "m2", team_id: "teams_t", user_id: "users_mate", visibility: "full" },
+    ],
+    conversations: [
+      { _id: "conversations_mine", user_id: "users_me", team_id: "teams_t", is_private: true, title: "Mine" },
+      { _id: "conversations_shared", user_id: "users_mate", team_id: "teams_t", is_private: false, title: "Shared" },
+      { _id: "conversations_private", user_id: "users_mate", team_id: "teams_t", is_private: true, title: "Private" },
+    ],
+    user_sends: [
+      send("a", "users_me", "conversations_mine", "my own prompt"),
+      send("b", "users_mate", "conversations_shared", "shared prompt"),
+      send("c", "users_mate", "conversations_private", "private prompt"),
+    ],
+  });
+  const { teamDay } = await import("./userSends");
+  const authCtx = (user: string | null) => ({ db, auth: { getUserIdentity: async () => (user ? { subject: `${user}|session` } : null) } });
+  const answer = await (teamDay as any)._handler(authCtx("users_me"), { team_id: "teams_t", date: "2026-10-29", timezone: "UTC" });
+  expect(answer.rows.map((r: any) => r.text).sort()).toEqual(["my own prompt", "shared prompt"]);
+  expect(answer.rows.find((r: any) => r.text === "shared prompt")).toMatchObject({ _id: "ps:messages_b", session_title: "Shared", date: "2026-10-29" });
+  expect(await (teamDay as any)._handler(authCtx("users_stranger"), { team_id: "teams_t", date: "2026-10-29" })).toBeNull();
+});

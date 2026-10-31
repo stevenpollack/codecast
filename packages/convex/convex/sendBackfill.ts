@@ -6,7 +6,8 @@ import { recordUsageDays, turnCost, turnTokens, type UsageTurn } from "./lib/usa
 import { approxMessageBytes } from "./userMessagesFilter";
 
 // Rebuild a day counter from the transcripts. `kind` picks which: "sends"
-// (default) is the typed-send counters (user_send_daily), read from
+// (default) is the typed-send counters (user_send_daily) and the per-send
+// log beside them (user_sends), read from
 // user-role messages; "usage" is the token and spend counters
 // (user_usage_daily, through usage_pending), read from the usage block on
 // assistant messages, which prod carries from 2026-09-13. `start` stops any
@@ -34,7 +35,7 @@ const usageSignature = (u: { input_tokens: number; output_tokens: number; cache_
 
 const kindArg = v.optional(v.union(v.literal("sends"), v.literal("usage")));
 type Kind = "sends" | "usage";
-const WIPE_TABLES: Record<Kind, string[]> = { sends: ["user_send_daily"], usage: ["usage_pending", "user_usage_daily"] };
+const WIPE_TABLES: Record<Kind, string[]> = { sends: ["user_send_daily", "user_sends"], usage: ["usage_pending", "user_usage_daily"] };
 
 // The steps of a rebuild still queued or running. A rebuild is finished only
 // when none are left: its counter rows appear early and keep growing after.

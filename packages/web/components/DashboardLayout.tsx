@@ -1,5 +1,6 @@
 import { SeatKillDialog } from "./org/SeatKillDialog";
 import { useSyncMetricSeries } from "../hooks/useMetricSeries";
+import { useSyncSessionIndex } from "../hooks/useSyncSessionIndex";
 import { HuddleStartHost } from "./calls/HuddleStartHost";
 import { ReactNode, useState, useCallback, useRef, useMemo, memo, createContext, useContext, lazy, Suspense } from "react";
 import { useMountEffect } from "../hooks/useMountEffect";
@@ -29,7 +30,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { ComposeHost } from "./ComposeHost";
 import { subscribeComposeOptimistic } from "../lib/composeBridge";
 import { NEW_SESSION_EVENT } from "../lib/utils";
-import { SquarePen, PanelLeft, PanelRight, Menu, MessageSquare, SquareTerminal, ChevronLeft, ChevronRight, Focus } from "lucide-react";
+import { SquarePen, PanelLeft, PanelRight, Menu, MessageSquare, SquareTerminal, ChevronLeft, ChevronRight } from "lucide-react";
 import { SetupPromptBanner } from "./SetupPromptBanner";
 import { TeamDomainBanner } from "./TeamDomainBanner";
 import { PasskeyProbationBanner } from "./PasskeyProbationBanner";
@@ -58,6 +59,7 @@ import { useWallet } from "../hooks/useWallet";
 import { TopbarButton, TopbarChip, TopbarTray } from "./TopbarButton";
 import { NewMenu } from "./NewMenu";
 import { TopbarRow } from "./TopbarRow";
+import { ZenCorner, ZenToggle } from "./ZenToggle";
 import { PhoneCallStrip } from "./calls/PhoneCallStrip";
 import { HeaderPins, AnchorPanel } from "./anchor/AnchorPanel";
 import { useSyncViewerRoles } from "../hooks/useSyncViewerRoles";
@@ -347,6 +349,8 @@ function HostFeeders() {
   // The workspace's metric series: the live numbers goals and projects read
   // wherever they are drawn (hooks/useMetricSeries), one subscription for all.
   useSyncMetricSeries();
+  // Every session the viewer owns, small, for the palette to search on the device.
+  useSyncSessionIndex();
   // A profile with no timezone takes this device's (team day cuts, local clocks).
   useAdoptTimezone();
   // Hosted mode's wallet: the rail's meter, Plan and the composer's held
@@ -638,6 +642,8 @@ function DashboardLayoutInner({ children, hideSidebar }: DashboardLayoutProps) {
   const isOnModObjectPage = pathname?.startsWith("/o/") ?? false;
   // The daily edition sets its own 1180px column (changes-page.md 4).
   const isOnChangesPage = pathname === "/changes";
+  // Prompts: a column per person, each its own scroll region.
+  const isOnPromptsPage = pathname === "/prompts";
   // Settings is a modal-like surface, not a working surface — selecting a session
   // there means "I'm done configuring, take me to it", not "peek beside". Keyed off
   // the real router URL because `pathname` lies here (returns the carried tab route).
@@ -645,7 +651,7 @@ function DashboardLayoutInner({ children, hideSidebar }: DashboardLayoutProps) {
   // isFullWidthRoute folds in the self-contained full-bleed pages (sessions,
   // admin) so the non-tab path matches the tab shell; the inbox check stays
   // explicit because it is source-aware, not just path-based.
-  const isFullWidthPage = isOnConversationPage || isOnCommitPage || isOnPRPage || isOnInboxPage || isOnTasksPage || isOnWorkflowsPage || isOnRoutinesPage || isOnTriggersPage || isOnSchedulesPage || isOnPlansPage || isOnGoalsPage || isOnCallsPage || isOnDocsPage || isOnCapabilitiesPage || isOnFilesPage || isOnVaultPage || isOnProjectsPage || isOnWindowsPage || isOnCrosstalkPage || isOnSessionMapPage || isOnRepoPage || isOnOrgPage || isOnChangesPage || isOnModPage || isOnModObjectsPage || isOnModObjectPage || isFullWidthRoute(pathname ?? "");
+  const isFullWidthPage = isOnConversationPage || isOnCommitPage || isOnPRPage || isOnInboxPage || isOnTasksPage || isOnWorkflowsPage || isOnRoutinesPage || isOnTriggersPage || isOnSchedulesPage || isOnPlansPage || isOnGoalsPage || isOnCallsPage || isOnDocsPage || isOnCapabilitiesPage || isOnFilesPage || isOnVaultPage || isOnProjectsPage || isOnWindowsPage || isOnCrosstalkPage || isOnSessionMapPage || isOnRepoPage || isOnOrgPage || isOnChangesPage || isOnPromptsPage || isOnModPage || isOnModObjectsPage || isOnModObjectPage || isFullWidthRoute(pathname ?? "");
 
   // The teammate comment rail is a conversation-scoped overlay, so its header
   // toggle only makes sense when a conversation is actually on screen.
@@ -1266,21 +1272,21 @@ function DashboardLayoutInner({ children, hideSidebar }: DashboardLayoutProps) {
       <ErrorBoundary name="DashboardSync" level="inline" fallback={null}>
         <DashboardSyncEffects />
       </ErrorBoundary>
-      {/* Zen keeps this bar but strips it to the window's own controls (zen,
-          sidebar, history, panels), so every page keeps its header as is and
-          the way out of zen is always where the way in was. An app window
-          (Chat, Work) replaces the bar with the app's own bar below. */}
+      {/* Zen hides this header. Each surface's own top row then stands in as
+          the titlebar (drag region + an inset past the zen corner) via
+          useTitlebarHead, and the zen toggle stays in that corner on every
+          page. An app window (Chat, Work) replaces it with the app's own bar. */}
+      {isZenMode && !appWindow && !barless && <ZenCorner />}
       {appWindow && <AppWindowBar app={appWindow} />}
       {hostedMode && !appWindow && <HostedSectionKeys />}
       {/* Header spans full width */}
       {/* Hosted mode's desktop shell has no top bar (useBarlessShell): the
           sidebar carries its search, workspace, bell and account. */}
-      {!barless && <header data-cc-topbar ref={headerRef} className={`flex-shrink-0 border-b border-black/10 bg-sol-bg z-[100] ${desktopClass} ${appWindow ? "hidden" : ""} relative`}>
+      {!barless && <header data-cc-topbar ref={headerRef} className={`flex-shrink-0 border-b border-black/10 bg-sol-bg z-[100] ${desktopClass} ${isZenMode || appWindow ? "hidden" : ""} relative`}>
         {typeof window !== "undefined" && window.location.hostname.includes("local.") && (
           <div data-cc-local-corner className="absolute top-0 left-0 w-0 h-0 border-t-[20px] border-r-[20px] border-t-emerald-500 border-r-transparent z-30" />
         )}
         <TopbarRow
-          zen={isZenMode}
           nav={<>
             {!hideSidebar && (
               <TopbarButton
@@ -1293,18 +1299,9 @@ function DashboardLayoutInner({ children, hideSidebar }: DashboardLayoutProps) {
                 <Menu />
               </TopbarButton>
             )}
-            {/* One toggle, lit while zen is on, in the same spot in both modes. */}
-            <ShortcutTooltip label={isZenMode ? "Exit zen mode" : "Enter zen mode"} action="ui.zenToggle">
-              <TopbarButton
-                onClick={(e) => { dispatchAction("ui.zenToggle"); tipActions.whisper('ui.zenToggle', e); }}
-                active={isZenMode}
-                aria-pressed={isZenMode}
-                aria-label="Zen mode"
-                desktopOnly
-              >
-                <Focus />
-              </TopbarButton>
-            </ShortcutTooltip>
+            {/* Zen hides this bar; the same toggle then sits in the window's
+                corner (ZenCorner), at this spot. */}
+            <ZenToggle />
             <ShortcutTooltip label={navHidden ? "Show sidebar" : "Hide sidebar"} action="sidebar.toggleLeft">
               <TopbarButton
                 onClick={(e) => { dispatchAction("sidebar.toggleLeft"); tipActions.whisper('sidebar.toggleLeft', e); }}

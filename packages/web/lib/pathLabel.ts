@@ -112,6 +112,10 @@ export function pathLabel(path: string, ui?: { lane?: string } | null): string {
     } catch {}
     return "Changes";
   }
+  if (clean === "/prompts") {
+    const day = changesDayLabel(new URLSearchParams(path.split("#")[0].split("?")[1] ?? "").get("d"));
+    return day ? `Prompts, ${day}` : "Prompts";
+  }
   // A Files tab is titled by the open file, not the encoded query string. An
   // old /vault?f=… Files link titles the same until it redirects to /files.
   if (/^\/files[?/]/.test(path) || legacyFilesHref(path)) {

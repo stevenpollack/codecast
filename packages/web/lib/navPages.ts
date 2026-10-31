@@ -51,6 +51,7 @@ export const NAV_PAGES: ReadonlyArray<{
   { label: "Capabilities", path: "/capabilities", icon: "grid", keywords: "skills mcp plugins drift machines library apps connect" },
   { label: "Pages", path: "/pages", icon: "file", keywords: "published html artifacts share cast publish gallery" },
   { label: "Mods", path: "/mods", icon: "grid", keywords: "mods plugins extensions customize panes commands blocks", secondary: true },
+  { label: "Prompts", path: "/prompts", icon: "message", keywords: "prompts typed messages sent sessions day people what everyone asked wrote today yesterday" },
   { label: "Team Charts", path: "/team/charts", icon: "grid", keywords: "activity punchcard heatmap hours messages typed sends members stats graphs" },
   // The company on one canvas, and its two read views. Teams without the org
   // feature keep them too: goals and projects need no agents.

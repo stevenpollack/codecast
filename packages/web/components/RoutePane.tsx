@@ -32,6 +32,8 @@ const Inbox = lazyPage("@/app/inbox/page", () => import("@/app/inbox/page"));
 const Feed = lazyPage("@/app/feed/page", () => import("@/app/feed/page"));
 // What the team shipped and why, one day as an edition (changes-page.md).
 const Changes = lazyPage("@/app/changes/page", () => import("@/app/changes/page"));
+// One day of what each person typed into sessions, a column each.
+const Prompts = lazyPage("@/app/prompts/page", () => import("@/app/prompts/page"));
 const Mods = lazyPage("@/app/mods/page", () => import("@/app/mods/page"));
 const ModPane = lazyPage("@/app/m/page", () => import("@/app/m/page"));
 const ModObjects = lazyPage("@/app/objects/page", () => import("@/app/objects/page"));
@@ -170,6 +172,7 @@ const ROUTES: RouteEntry[] = [
   { pattern: /^\/inbox$/, paramNames: [], component: Inbox },
   { pattern: /^\/feed$/, paramNames: [], component: Feed },
   { pattern: /^\/changes$/, paramNames: [], component: Changes },
+  { pattern: /^\/prompts$/, paramNames: [], component: Prompts },
   { pattern: /^\/mods$/, paramNames: [], component: Mods },
   { pattern: /^\/m\/([^/]+)$/, paramNames: ["mod"], component: ModPane },
   { pattern: /^\/m\/([^/]+)\/([^/]+)$/, paramNames: ["mod", "pane"], component: ModPane },

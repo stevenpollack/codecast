@@ -906,7 +906,10 @@ export default defineSchema({
     thread_state_status: v.optional(v.string()),
     // The pin's json block, whole: what a workflow station reports for its
     // edges to route on (cast state; the text above is capped for display).
+    // It is the run's input, not a claim on anyone's attention, so a person's
+    // message takes the pin down and leaves the report and its time standing.
     thread_state_result: v.optional(v.string()),
+    thread_state_result_at: v.optional(v.number()),
     // The page an agent offered as a pane (`cast browser pane <url>`). One
     // latest offer, never a list: an agent that started three dev servers is
     // telling the reader about the newest, and a queue of dead addresses reads
@@ -4178,6 +4181,25 @@ export default defineSchema({
     .index("by_user_day", ["user_id", "day_start"])
     .index("by_user_team_day", ["user_id", "team_id", "day_start"]),
 
+  // One row per counted send (the rows user_send_daily sums), so the Prompts
+  // page reads a team's day of sends without scanning its sessions. Carries
+  // the prompt as displayed, clipped, because a message row can hold inline
+  // images and a day of them would pass a query's read limit. Written beside
+  // the counter in recordSendFor and emptied with it by a send rebuild
+  // (sendBackfill).
+  user_sends: defineTable({
+    user_id: v.id("users"),
+    team_id: v.optional(v.id("teams")),
+    conversation_id: v.id("conversations"),
+    message_id: v.id("messages"),
+    timestamp: v.number(),
+    words: v.number(),
+    text: v.string(),
+    clipped: v.boolean(),
+  })
+    .index("by_team_timestamp", ["team_id", "timestamp"])
+    .index("by_message", ["message_id"]),
+
   // Per-day token and spend counters (the "Tokens" and "Spend" chart
   // metrics). One row per (user, team, UTC day), 24 UTC-hour buckets each;
   // spend is dollars at API list price. Never written by a transcript insert:
@@ -7136,6 +7158,18 @@ export default defineSchema({
     size: v.number(),
   }).index("by_artifact_version", ["artifact_id", "version", "path"]),
 
+  // Bundle files a CLI uploaded ahead of its publish (POST /cli/artifacts/upload),
+  // so big files never pass through the publish action's 64 MB heap as base64.
+  // A row proves who uploaded the blob; the publish that attaches it deletes the
+  // row, and the sweep deletes blobs nobody attached.
+  artifact_uploads: defineTable({
+    user_id: v.id("users"),
+    storage_id: v.id("_storage"),
+    created_at: v.number(),
+  })
+    .index("by_storage_id", ["storage_id"])
+    .index("by_created_at", ["created_at"]),
+
   // Viewer comments. A batch_id groups the comments one viewer submitted
   // together (they arrive in the publishing session as ONE message).
   artifact_comments: defineTable({
@@ -8238,6 +8272,9 @@ export default defineSchema({
     // graph it loaded at start, so the run's machine restarts the runner once the run waits at a gate (daemon
     // resumeOrphanedWorkflowRuns); the new runner's first report clears it.
     restart_runner_at: v.optional(v.number()),
+    // A place at a station that takes only so many runs at once (the line profile's caps.stations), held from
+    // admission (admitToStation) until the run reports another station or ends.
+    station_place: v.optional(v.object({ node_id: v.string(), at: v.number() })),
   })
     .index("by_share_token", ["share_token"])
     // A daemon's sweep for its own live runs whose runner is gone.
