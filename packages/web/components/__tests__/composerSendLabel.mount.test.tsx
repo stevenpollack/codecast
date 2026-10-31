@@ -5,7 +5,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { act } from "react";
+import { act, type ReactElement } from "react";
 import { JSDOM } from "jsdom";
 import { replaceGlobals } from "../../test-helpers/globals";
 
@@ -37,12 +37,17 @@ test("a label makes the send a violet pill that says what it applies; without on
     expect(b.className).not.toMatch(/(^|\s)(w-\d|w-\[|aspect-)/);
     expect(b.disabled).toBe(false);
     expect(b.querySelector("svg")).not.toBeNull();
-    // Held: the same pill, faded.
-    await act(() => root.render(<ComposerSendButton canSubmit={false} label="Send 2 answers" title="Out of allowance" />));
+    // Held: the same pill, faded; its tooltip says why and offers no key, and
+    // sits on a wrapper because a disabled button gets no pointer events.
+    const tip = (button: ReactElement, words: string, accel?: string) => <span data-tip={words} data-accel={accel ?? ""}>{button}</span>;
+    await act(() => root.render(<ComposerSendButton canSubmit={false} label="Send 2 answers" title="Out of allowance" tip={tip} />));
     b = button(host);
     expect(b.disabled).toBe(true);
     expect(b.className).toContain("opacity-[0.45]");
-    expect(b.title).toBe("Out of allowance");
+    const held = host.querySelector<HTMLElement>("[data-tip]")!;
+    expect(held.dataset.tip).toBe("Out of allowance");
+    expect(held.dataset.accel).toBe("");
+    expect(b.parentElement).not.toBe(held);
     expect(b.textContent?.trim()).toBe("Send 2 answers");
     // No label: the icon, named Send, no label hook.
     await act(() => root.render(<ComposerSendButton canSubmit />));

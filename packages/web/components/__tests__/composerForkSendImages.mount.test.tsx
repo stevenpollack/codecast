@@ -120,7 +120,7 @@ async function forkSendWithImage(via: "tail" | "selection") {
   await act(() => { setNativeValue(textarea, textarea.value.replace("earlier prompt", "") + "look at this"); });
   await flush();
   await act(() => {
-    if (via === "tail") (container.querySelector('button[title^="Fork and send"]') as HTMLButtonElement).click();
+    if (via === "tail") (container.querySelector('button[aria-label="Fork and send"]') as HTMLButtonElement).click();
     else textarea.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
   });
   await flushUntil(() => calls.some((c) => c.action === "sendMessage"));

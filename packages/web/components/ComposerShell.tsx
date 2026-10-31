@@ -186,6 +186,8 @@ export const ComposerTextarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttr
  * says what the send does; the bare box ignores it. While a turn runs and
  * there is text, `stopAndSend` joins a Stop square to the disc's left: the
  * square stops the turn and then sends, the arrow sends into the running turn.
+ * `tip` puts the surface's tooltip on each button; a disabled button is wrapped
+ * in a span first, since a disabled button gets no pointer events.
  */
 export function ComposerSendButton({
   canSubmit,
@@ -195,6 +197,7 @@ export function ComposerSendButton({
   label,
   stop,
   stopAndSend,
+  tip,
 }: {
   canSubmit: boolean;
   bare?: boolean;
@@ -205,23 +208,29 @@ export function ComposerSendButton({
   label?: string;
   /** While a turn runs and there is nothing to send, the disc is a Stop
    *  square: its words (the mode's stopWorking) and what it does. */
-  stop?: { label: string; onStop: () => void };
+  stop?: { label: string; onStop: () => void; accel?: string };
   /** Stop the running turn, then send. `wrap` puts a tooltip on the square. */
   stopAndSend?: { onStopAndSend: () => void; wrap?: (square: ReactElement) => ReactNode };
+  /** Wraps a button in a tooltip with its words and, when it can act, its key. */
+  tip?: (button: ReactElement, label: string, accel?: string) => ReactNode;
 }) {
+  const tipped = (button: ReactElement, words: string, accel?: string, enabled = true) =>
+    tip ? tip(enabled ? button : <span className="inline-flex">{button}</span>, words, enabled ? accel : undefined) : button;
+  const sendWords = title ?? "Send";
   if (stop && !bare) {
-    return (
+    return tipped(
       <button
         type="button"
         onClick={stop.onStop}
         className="w-8 h-8 rounded-full transition-colors flex items-center justify-center border border-sol-border bg-sol-bg-alt text-sol-text hover:bg-sol-bg-highlight"
         aria-label={stop.label}
-        title={stop.label}
         data-cc-send=""
         data-cc-stop=""
       >
         <span aria-hidden className="h-2.5 w-2.5 rounded-[2px] bg-current" />
-      </button>
+      </button>,
+      stop.label,
+      stop.accel,
     );
   }
   if (stopAndSend && !bare && !label) {
@@ -240,29 +249,27 @@ export function ComposerSendButton({
       <div className="h-8 rounded-full border border-sol-blue/50 bg-sol-blue/20 flex items-stretch overflow-hidden">
         {stopAndSend.wrap ? stopAndSend.wrap(square) : square}
         <span aria-hidden className="w-px my-2 bg-sol-blue/30" />
-        <button
+        {tipped(<button
           type="submit"
           disabled={!canSubmit}
           className={`h-full pl-2 pr-2.5 flex items-center justify-center text-sol-blue transition-colors ${canSubmit ? "hover:bg-sol-blue/30" : "opacity-40 cursor-not-allowed"}`}
           aria-label="Send"
-          title={title}
           data-cc-send=""
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5M5 12l7-7 7 7" />
           </svg>
-        </button>
+        </button>, sendWords, "enter", canSubmit)}
       </div>
     );
   }
   if (label && !bare) {
-    return (
+    return tipped(
       <button
         type="submit"
         disabled={!canSubmit}
         className={`h-8 rounded-full px-3 text-[12.5px] font-semibold whitespace-nowrap inline-flex items-center gap-1.5 transition-opacity bg-[var(--sol-violet)] text-[var(--sol-bg)] ${canSubmit ? "hover:opacity-90" : "opacity-[0.45] cursor-not-allowed"}`}
         aria-label={label}
-        title={title}
         data-cc-send=""
         data-cc-send-label={label}
       >
@@ -270,7 +277,10 @@ export function ComposerSendButton({
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5M5 12l7-7 7 7" />
         </svg>
-      </button>
+      </button>,
+      title ?? label,
+      "enter",
+      canSubmit,
     );
   }
   const className = bare
@@ -284,18 +294,20 @@ export function ComposerSendButton({
             ? "border-sol-cyan/50 bg-sol-cyan/20 text-sol-cyan hover:bg-sol-cyan/30 hover:border-sol-cyan"
             : "border-sol-blue/50 bg-sol-blue/20 text-sol-blue hover:bg-sol-blue/30 hover:border-sol-blue hover:text-sol-blue"
       }`;
-  return (
+  return tipped(
     <button
       type="submit"
       disabled={!canSubmit}
       className={className}
       aria-label="Send"
-      title={title}
       data-cc-send={bare ? undefined : ""}
     >
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5M5 12l7-7 7 7" />
       </svg>
-    </button>
+    </button>,
+    sendWords,
+    "enter",
+    canSubmit,
   );
 }

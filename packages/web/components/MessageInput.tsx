@@ -2427,37 +2427,41 @@ export const MessageInput = memo(function MessageInput({ conversationId, status,
     ? { label: MODE_WORDS.hosted.stopWorking, onStop: () => useInboxStore.getState().stopHostedTurn(conversationId) }
     : undefined;
   // A session's turn at work with nothing to send: the disc stops it.
-  const sessionStop = turnRunning && !canSubmit ? { label: "Stop", onStop: interruptTurn } : undefined;
+  const sessionStop = turnRunning && !canSubmit ? { label: "Stop", onStop: interruptTurn, accel: "escape" } : undefined;
   // A session's turn at work with text in the box: a Stop square joins the
   // disc, so stopping first is part of sending.
   const stopAndSend = canStopAndSend && hasContent && !onGateSend && !onWorkflowLaunch ? {
     onStopAndSend: stopAndSendComposerText,
     wrap: (square: ReactElement) => <ShortcutTooltip label="Stop the turn, then send" action="msg.stopSend" side="top">{square}</ShortcutTooltip>,
   } : undefined;
-  const sendButton = <ComposerSendButton canSubmit={canSubmit} bare={bareComposer} quotesOnly={quotesOnlySend} title={allowanceOut ?? undefined} label={batchWords.button ?? undefined} stop={hostedStop ?? sessionStop} stopAndSend={stopAndSend} />;
+  const sendButton = <ComposerSendButton canSubmit={canSubmit} bare={bareComposer} quotesOnly={quotesOnlySend} title={allowanceOut ?? undefined} label={batchWords.button ?? undefined} stop={hostedStop ?? sessionStop} stopAndSend={stopAndSend} tip={(button, words, accel) => <ShortcutTooltip label={words} accel={accel} side="top">{button}</ShortcutTooltip>} />;
   // Expand, stash, hand off and fork: beside the text, or in the surface's foot
   // row next to send when it brings one.
   const rowActions = (
     <>
       {composeMode ? (
-        <button
-          type="button"
-          onClick={toggleCompose}
-          className="w-7 h-7 rounded-full transition-colors flex items-center justify-center text-sol-text-dim hover:text-sol-text hover:bg-sol-bg/50"
-          title="Collapse editor (Cmd+Shift+E)"
-        >
-          <Minimize2 className="w-3.5 h-3.5" />
-        </button>
+        <ShortcutTooltip label="Collapse editor" action="compose.richToggle" side="top">
+          <button
+            type="button"
+            onClick={toggleCompose}
+            className="w-7 h-7 rounded-full transition-colors flex items-center justify-center text-sol-text-dim hover:text-sol-text hover:bg-sol-bg/50"
+            aria-label="Collapse editor"
+          >
+            <Minimize2 className="w-3.5 h-3.5" />
+          </button>
+        </ShortcutTooltip>
       ) : isMultiline && (
         // A hosted conversation's phone composer is the text and Send alone.
-        <button
-          type="button"
-          onClick={toggleCompose}
-          className={`w-7 h-7 rounded-full transition-colors flex items-center justify-center text-sol-text-dim/30 hover:text-sol-text-dim hover:bg-sol-bg/50 ${hostedConversation ? "max-md:hidden" : ""}`}
-          title="Expand editor (Cmd+Shift+E)"
-        >
-          <Maximize2 className="w-3 h-3" />
-        </button>
+        <ShortcutTooltip label="Expand editor" action="compose.richToggle" side="top">
+          <button
+            type="button"
+            onClick={toggleCompose}
+            className={`w-7 h-7 rounded-full transition-colors flex items-center justify-center text-sol-text-dim/30 hover:text-sol-text-dim hover:bg-sol-bg/50 ${hostedConversation ? "max-md:hidden" : ""}`}
+            aria-label="Expand editor"
+          >
+            <Maximize2 className="w-3 h-3" />
+          </button>
+        </ShortcutTooltip>
       )}
       {onSendAndDismiss && triageShown && canSubmit && !onGateSend && !onWorkflowLaunch && (
         <ShortcutTooltip label="Send and stash" action="msg.sendDismiss" hint="the agent keeps running out of the inbox" side="top">
@@ -2486,14 +2490,16 @@ export const MessageInput = memo(function MessageInput({ conversationId, status,
         </HandoffPicker>
       )}
       {onForkTail && !hostedConversation && canSubmit && !onGateSend && !onWorkflowLaunch && (
-        <button
-          type="button"
-          onClick={handleForkSend}
-          className="w-7 h-7 rounded-full transition-colors flex items-center justify-center text-[color-mix(in_srgb,var(--sol-text-dim)_40%,transparent)] hover:text-sol-cyan hover:bg-sol-cyan/10"
-          title={`Fork and send (${navigator.platform?.includes("Mac") ? "Cmd" : "Ctrl"}+Shift+Enter)`}
-        >
-          <Split className="w-3.5 h-3.5" />
-        </button>
+        <ShortcutTooltip label="Fork and send" action="msg.forkSend" side="top">
+          <button
+            type="button"
+            onClick={handleForkSend}
+            className="w-7 h-7 rounded-full transition-colors flex items-center justify-center text-[color-mix(in_srgb,var(--sol-text-dim)_40%,transparent)] hover:text-sol-cyan hover:bg-sol-cyan/10"
+            aria-label="Fork and send"
+          >
+            <Split className="w-3.5 h-3.5" />
+          </button>
+        </ShortcutTooltip>
       )}
     </>
   );

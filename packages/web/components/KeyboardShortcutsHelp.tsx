@@ -244,9 +244,11 @@ function isTooltipAnchored(el: HTMLElement): boolean {
 // A tooltip closes the moment the pointer leaves its trigger, so it holds
 // words only. A panel with something to read, select or press goes in
 // ui/HoverCard, which stays open while the pointer crosses onto it.
-export function ShortcutTooltip({ label, action, hint, side = "bottom", align, eager = false, children }: {
+export function ShortcutTooltip({ label, action, accel, hint, side = "bottom", align, eager = false, children }: {
   label: ReactNode;
   action?: ShortcutAction;
+  /** A chord with no registry action (the composer's SEND_CHORDS), in accelerator syntax. */
+  accel?: string;
   // Optional trailing note rendered dimmed after the keycaps, e.g. "cycles" for a
   // key that steps through options rather than toggling.
   hint?: ReactNode;
@@ -321,7 +323,7 @@ export function ShortcutTooltip({ label, action, hint, side = "bottom", align, e
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
   };
   const defs = action ? getShortcutsForAction(action) : [];
-  const parts = defs.length > 0 ? formatShortcutParts(defs[0]) : null;
+  const parts = defs.length > 0 ? formatShortcutParts(defs[0]) : accel ? formatAcceleratorParts(accel) : null;
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip open={open} onOpenChange={(v) => { cancelFirstShow(); setOpen(v); }}>
