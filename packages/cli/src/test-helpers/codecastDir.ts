@@ -15,6 +15,7 @@
  * directory the test writes its fixtures into.
  */
 
+import { afterEach, beforeEach } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -46,4 +47,16 @@ export function isolateCodecastDir(prefix = "cast-test-home-"): IsolatedCodecast
       fs.rmSync(dir, { recursive: true, force: true });
     },
   };
+}
+
+/**
+ * Isolate every test in the calling file: a fresh CODECAST_DIR before each, the
+ * undo after. For files whose code writes CLI state on every test, such as a
+ * workflow run's pid file (one runner per run id), which parallel test files
+ * would otherwise fight over in a shared directory.
+ */
+export function isolateCodecastDirEachTest(prefix?: string): void {
+  let state: IsolatedCodecastDir | undefined;
+  beforeEach(() => { state = isolateCodecastDir(prefix); });
+  afterEach(() => state?.restore());
 }

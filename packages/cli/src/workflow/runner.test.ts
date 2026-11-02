@@ -5,6 +5,8 @@ import * as os from "os";
 import { parseWorkflowSource, parseWorkflowFile, validateWorkflow } from "./parser.js";
 import { runWorkflow, reportRunStopped, refreshedOnResume, graphToPushPayload, parseGateEdgeLabel, gatePayload, handTimeoutMs, stationTitle, runRegistrationIsFatal, buildNodePrompt, PRESENTER_BASE, type RunOptions } from "./runner.js";
 import { BUILTIN_WORKFLOW_TEMPLATES } from "./templates.js";
+import { isolateCodecastDirEachTest } from "../test-helpers/codecastDir.js";
+isolateCodecastDirEachTest("cast-wf-state-");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

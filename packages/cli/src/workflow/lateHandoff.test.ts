@@ -13,6 +13,8 @@ import * as os from "os";
 import { parseWorkflowSource } from "./parser.js";
 import { runWorkflow, type RunOptions } from "./runner.js";
 import { BUILTIN_WORKFLOW_TEMPLATES } from "./templates";
+import { isolateCodecastDirEachTest } from "../test-helpers/codecastDir.js";
+isolateCodecastDirEachTest("cast-wf-state-");
 
 const shipped = parseWorkflowSource(BUILTIN_WORKFLOW_TEMPLATES.line);
 const builders = ["implement", "implement_line"];
