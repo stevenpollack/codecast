@@ -4,6 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { parseWorkflowSource } from "./parser.js";
 import { runWorkflow, type RunOptions } from "./runner.js";
+import { isolateCodecastDirEachTest } from "../test-helpers/codecastDir.js";
+isolateCodecastDirEachTest("cast-wf-state-");
 
 // Oct 26: seven cards answered Revise sent their runs back to a build whose
 // visits a check loop had spent, and each run failed on max_visits at once:

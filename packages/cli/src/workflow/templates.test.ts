@@ -18,6 +18,8 @@ import { BUILTIN_WORKFLOW_TEMPLATES, LINE_TEMPLATE_FILES, inlineTemplateFiles, r
 import { JUDGE_REVIEW_GRAPH } from "@codecast/shared/contracts/judgeReview";
 import type { WorkflowGraph } from "./types";
 import { unattendedOpening } from "../unattended";
+import { isolateCodecastDirEachTest } from "../test-helpers/codecastDir.js";
+isolateCodecastDirEachTest("cast-wf-state-");
 
 const TEMPLATE_DIR = path.join(import.meta.dir, "templates");
 const AGENT_NODES = ["ground", "plan", "analyze", "prove", "prove_line", "implement", "implement_line", "review", "card_write"];

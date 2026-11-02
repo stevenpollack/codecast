@@ -9,6 +9,8 @@ import * as path from "path";
 import * as os from "os";
 import { parseWorkflowSource } from "./parser.js";
 import { runWorkflow, waitForStationPlace, type RunOptions } from "./runner.js";
+import { isolateCodecastDirEachTest } from "../test-helpers/codecastDir.js";
+isolateCodecastDirEachTest("cast-wf-state-");
 
 const graph = parseWorkflowSource(`digraph line {
   start [shape=Mdiamond]
